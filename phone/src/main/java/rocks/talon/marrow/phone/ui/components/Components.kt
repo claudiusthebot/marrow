@@ -152,7 +152,6 @@ fun LiveStatChip(
     onClick: (() -> Unit)? = null,
 ) {
     val container = MaterialTheme.colorScheme.surfaceContainerHigh
-    val border = MaterialTheme.colorScheme.outlineVariant
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
@@ -182,9 +181,6 @@ fun LiveStatChip(
             )
         }
     }
-    Spacer(Modifier.size(0.dp))
-    @Suppress("UNUSED_VARIABLE")
-    val _unused = border
 }
 
 /** Key/value row — used in section detail bodies. */

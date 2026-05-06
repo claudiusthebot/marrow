@@ -53,7 +53,9 @@ fun SectionDetail(
     val phone by vm.phoneSnapshot.collectAsState()
     val watch by vm.watchSnapshot.collectAsState()
     val watchCached by vm.cachedWatchSnapshot.collectAsState()
-    val refreshing by (if (source == "watch") vm.watchRefreshing else vm.phoneRefreshing).collectAsState()
+    val phoneRefreshing by vm.phoneRefreshing.collectAsState()
+    val watchRefreshing by vm.watchRefreshing.collectAsState()
+    val refreshing = if (source == "watch") watchRefreshing else phoneRefreshing
 
     val snapshot = if (source == "watch") (watch ?: watchCached) else phone
     val section = remember(snapshot, sectionId) { snapshot?.sections?.firstOrNull { it.id == sectionId } }
@@ -65,7 +67,7 @@ fun SectionDetail(
         topBar = {
             LargeTopAppBar(
                 title = {
-                    Text(section?.title ?: "Section", style = MaterialTheme.typography.headlineMedium)
+                    Text(section?.title ?: "Section")
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -126,6 +128,11 @@ fun SectionDetail(
                                     monospaceValue = isMonospace(row.label),
                                     onClick = {
                                         copyToClipboard(ctx, row.label, row.value)
+                                        android.widget.Toast.makeText(
+                                            ctx,
+                                            "Copied ${row.label}",
+                                            android.widget.Toast.LENGTH_SHORT,
+                                        ).show()
                                     },
                                 )
                                 if (i < section.rows.lastIndex) {
