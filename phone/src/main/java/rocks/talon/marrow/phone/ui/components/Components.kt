@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -47,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 
 /* -------------------------------------------------------------------------- */
 /* Marrow design system — surfaces, tiles, chips, progress, headings.          */
@@ -54,20 +54,24 @@ import androidx.compose.ui.unit.dp
 /* The vocabulary closely mirrors PixelPlayer's DeviceCapabilitiesScreen so   */
 /* the visual language stays consistent with the reference Dylan called out:  */
 /*                                                                             */
-/*   • CapabilityCard — top-level rounded surface (28dp, surfaceContainer)    */
-/*   • InfoTile      — labelled value cell (18dp, surfaceContainerLow)        */
-/*   • HeroMetricTile — content-centred metric (18dp, tinted container)       */
+/*   • CapabilityCard — top-level squircle surface (28dp/60, surfaceContainer)*/
+/*   • InfoTile      — labelled value cell (18dp/60, surfaceContainerLow)     */
+/*   • HeroMetricTile — content-centred metric (18dp/60, tinted container)    */
 /*   • TonalChip     — pill chip (CircleShape, surfaceContainerHighest)       */
 /*   • StatusIcon    — 44dp circle badge for card headers                     */
 /*   • ProgressReadout — label/value row + 8dp progress bar                   */
 /*   • SectionLabel  — semibold titleSmall heading inside a card              */
+/*                                                                             */
+/* Shapes: AbsoluteSmoothCornerShape(radius, 60) everywhere — 60 is the       */
+/* smoothness percent PixelPlayer uses (0=standard rounded, 100=full iOS      */
+/* squircle). Cards=28dp, tiles=18dp, hero=32dp.                              */
 /* -------------------------------------------------------------------------- */
 
 /* ---- Cards & surfaces --------------------------------------------------- */
 
 /**
  * The top-level card every section uses on the home screen and in detail
- * heroes. 28dp rounded corners, `surfaceContainer` background, no tonal
+ * heroes. 28dp squircle corners, `surfaceContainer` background, no tonal
  * elevation. Optional press-scale feedback when [onClick] is supplied.
  */
 @Composable
@@ -91,7 +95,7 @@ fun MarrowCapabilityCard(
         onClick = onClick,
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(verticalSpacing),
         ) {
             Row(
@@ -118,7 +122,8 @@ fun MarrowCapabilityCard(
 
 /**
  * Press-scale wrapper used by all clickable surfaces. Adds a subtle scale +
- * haptic kick when [onClick] is set.
+ * haptic kick when [onClick] is set. Uses [AbsoluteSmoothCornerShape] for the
+ * squircle visual language consistent with PixelPlayer.
  */
 @Composable
 fun MarrowSurface(
@@ -141,7 +146,9 @@ fun MarrowSurface(
     )
     val haptic = LocalHapticFeedback.current
     val mod = modifier.scale(scale)
-    val shape = RoundedCornerShape(cornerRadius)
+    // Squircle shape: smoothness=60 matches PixelPlayer's AbsoluteSmoothCornerShape usage.
+    // 0 = standard circular corners, 100 = full iOS-style superellipse.
+    val shape = AbsoluteSmoothCornerShape(cornerRadius, 60)
     if (onClick != null) {
         Card(
             onClick = {
@@ -220,7 +227,7 @@ fun InfoTile(
         modifier = modifier
             .fillMaxHeight()
             .defaultMinSize(minHeight = 86.dp),
-        shape = RoundedCornerShape(18.dp),
+        shape = AbsoluteSmoothCornerShape(18.dp, 60),
         color = container,
     ) {
         Column(
@@ -283,7 +290,7 @@ fun HeroMetricTile(
         modifier = modifier
             .fillMaxHeight()
             .defaultMinSize(minHeight = minHeight),
-        shape = RoundedCornerShape(18.dp),
+        shape = AbsoluteSmoothCornerShape(18.dp, 60),
         color = container,
     ) {
         Column(
@@ -467,7 +474,10 @@ fun IconBadge(
     Box(
         modifier = modifier
             .size(size.dp)
-            .clip(if (cornerRadius >= size / 2) CircleShape else RoundedCornerShape(cornerRadius.dp))
+            .clip(
+                if (cornerRadius >= size / 2) CircleShape
+                else AbsoluteSmoothCornerShape(cornerRadius.dp, 60)
+            )
             .background(container),
         contentAlignment = Alignment.Center,
     ) {
