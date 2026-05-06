@@ -102,8 +102,8 @@ fun SectionDetail(
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (section == null) {
                     item { NoData() }
@@ -112,14 +112,12 @@ fun SectionDetail(
 
                 // Per-section hero
                 item {
-                    Box(modifier = Modifier.padding(horizontal = 8.dp)) {
-                        SectionHero(vm = vm, section = section, source = source)
-                    }
+                    SectionHero(vm = vm, section = section, source = source)
                 }
 
                 // Section rows as a card list
                 item {
-                    MarrowCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                    MarrowCard(modifier = Modifier.fillMaxWidth()) {
                         Column {
                             section.rows.forEachIndexed { i, row ->
                                 KeyValueRow(
@@ -138,7 +136,7 @@ fun SectionDetail(
                                 if (i < section.rows.lastIndex) {
                                     HorizontalDivider(
                                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                                        modifier = Modifier.padding(horizontal = 20.dp),
+                                        modifier = Modifier.padding(horizontal = 16.dp),
                                     )
                                 }
                             }
@@ -149,8 +147,8 @@ fun SectionDetail(
                 // Tap-to-copy hint
                 item {
                     Text(
-                        "Tap any row to copy its value.",
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                        text = "Tap any row to copy its value.",
+                        modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 4.dp),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
