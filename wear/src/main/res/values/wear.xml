@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The phone discovers reachable watches by querying for this capability.
+    Must match shared.MarrowPaths.CAPABILITY_PROVIDER.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string-array
+        name="android_wear_capabilities"
+        translatable="false"
+        tools:ignore="UnusedResources">
+        <item>marrow_device_info_provider</item>
+    </string-array>
+</resources>
