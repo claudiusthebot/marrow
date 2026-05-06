@@ -45,11 +45,45 @@ object DeviceInfoCollector {
             add(sensorsSection(context))
             cameraSection(context)?.let { add(it) }
             add(buildFlagsSection())
+            add(softwareSection(context))
         }
         return DeviceInfoSnapshot(
             capturedAtEpochMs = System.currentTimeMillis(),
             source = source,
             sections = sections,
+        )
+    }
+
+    // -- Software ------------------------------------------------------------
+
+    private fun softwareSection(context: Context): Section {
+        val pm = context.packageManager
+        val rows = mutableListOf<Row>()
+        rows += Row("Java VM", System.getProperty("java.vm.version") ?: "?")
+        rows += Row("Java vendor", System.getProperty("java.vendor") ?: "?")
+        rows += Row("Java home", System.getProperty("java.home") ?: "?")
+        rows += Row("OS arch", System.getProperty("os.arch") ?: "?")
+        rows += Row("Locale", java.util.Locale.getDefault().toLanguageTag())
+        rows += Row("Time zone", java.util.TimeZone.getDefault().id)
+        runCatching {
+            val all = pm.getInstalledApplications(0)
+            val system = all.count { (it.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0 }
+            val user = all.size - system
+            rows += Row("Installed apps", "${all.size} (${user} user · ${system} system)")
+        }
+        runCatching {
+            rows += Row("Runtime", System.getProperty("java.runtime.version") ?: "?")
+            rows += Row("Class version", System.getProperty("java.class.version") ?: "?")
+        }
+        rows += Row("Heap (max)", formatBytes(Runtime.getRuntime().maxMemory()))
+        rows += Row("Heap (total)", formatBytes(Runtime.getRuntime().totalMemory()))
+        rows += Row("Heap (free)", formatBytes(Runtime.getRuntime().freeMemory()))
+        return Section(
+            id = Sections.SOFTWARE,
+            title = "Software",
+            icon = "software",
+            rows = rows,
+            preview = System.getProperty("java.vm.version") ?: "ART",
         )
     }
 

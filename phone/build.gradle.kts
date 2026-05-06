@@ -13,8 +13,8 @@ android {
         applicationId = "rocks.talon.marrow"
         minSdk = 30
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 3
+        versionName = "0.2.0"
     }
 
     buildTypes {
@@ -50,7 +50,7 @@ dependencies {
     // Material 3 Expressive — alpha line for ButtonGroup, MotionScheme.expressive(),
     // wavy progress, etc. (1.4 stable still hides those as `internal`.)
     implementation("androidx.compose.material3:material3:1.5.0-alpha18")
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.animation:animation")
 
@@ -58,6 +58,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation("androidx.navigation:navigation-compose:2.8.5")
+    implementation("androidx.compose.material3:material3-window-size-class:1.3.1")
+    implementation("androidx.window:window:1.3.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
