@@ -3,23 +3,29 @@ package rocks.talon.marrow.wear
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import rocks.talon.marrow.shared.DeviceInfoCollector
 import rocks.talon.marrow.shared.DeviceInfoSnapshot
+import rocks.talon.marrow.shared.LiveStats
 import rocks.talon.marrow.wear.sync.pingPhone
 
 /**
  * Holds the shared device-info snapshot for every screen in the watch app and
  * the small ping-phone state machine.
  *
- * Important perf invariant: this VM is hoisted at the activity scope so the list
- * screen and any detail screen reuse the same instance — collection runs once on
- * launch, not on every navigation. All collection work happens on `Dispatchers.IO`.
+ * v0.2.0 additions:
+ * - Live battery/memory polling while the screen is on (driven by detail
+ *   screens calling `startLive()` / `stopLive()` from `DisposableEffect`).
+ * - Phone connectivity flag (used by the disconnected state).
  */
 class WearViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -32,10 +38,20 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val _pingState = MutableStateFlow(PingState.IDLE)
     val pingState: StateFlow<PingState> = _pingState.asStateFlow()
 
+    private val _phoneReachable = MutableStateFlow(true)
+    val phoneReachable: StateFlow<Boolean> = _phoneReachable.asStateFlow()
+
+    private val _battery = MutableStateFlow<LiveStats.Battery?>(null)
+    val battery: StateFlow<LiveStats.Battery?> = _battery.asStateFlow()
+
+    private val _memory = MutableStateFlow<LiveStats.Memory?>(null)
+    val memory: StateFlow<LiveStats.Memory?> = _memory.asStateFlow()
+
+    private var liveJob: Job? = null
+
     init {
-        // Kick off the first collection eagerly — UI shows a progress indicator
-        // until the StateFlow flips from null to a snapshot.
         refresh()
+        checkPhoneReachable()
     }
 
     fun refresh() {
@@ -46,8 +62,29 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 DeviceInfoCollector.collect(getApplication(), DeviceInfoSnapshot.Source.WEAR)
             }
             _snapshot.value = snap
+            // Also seed live stats from this collection
+            _battery.value = withContext(Dispatchers.IO) { LiveStats.battery(getApplication()) }
+            _memory.value = withContext(Dispatchers.IO) { LiveStats.memory(getApplication()) }
             _refreshing.value = false
+            checkPhoneReachable()
         }
+    }
+
+    /** Start the live battery/memory loop. Idempotent — safe to call repeatedly. */
+    fun startLive() {
+        if (liveJob?.isActive == true) return
+        liveJob = viewModelScope.launch(Dispatchers.IO) {
+            while (true) {
+                _battery.value = LiveStats.battery(getApplication())
+                _memory.value = LiveStats.memory(getApplication())
+                delay(10_000L)
+            }
+        }
+    }
+
+    fun stopLive() {
+        liveJob?.cancel()
+        liveJob = null
     }
 
     fun ping() {
@@ -55,9 +92,25 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             _pingState.value = PingState.SENDING
             val ok = withContext(Dispatchers.IO) { pingPhone(getApplication()) }
             _pingState.value = if (ok) PingState.SENT else PingState.FAILED
-            kotlinx.coroutines.delay(1500)
+            delay(1500)
             _pingState.value = PingState.IDLE
         }
+    }
+
+    private fun checkPhoneReachable() {
+        viewModelScope.launch {
+            val nodes = withContext(Dispatchers.IO) {
+                runCatching {
+                    Wearable.getNodeClient(getApplication()).connectedNodes.await()
+                }.getOrNull().orEmpty()
+            }
+            _phoneReachable.value = nodes.isNotEmpty()
+        }
+    }
+
+    override fun onCleared() {
+        liveJob?.cancel()
+        super.onCleared()
     }
 
     enum class PingState { IDLE, SENDING, SENT, FAILED }

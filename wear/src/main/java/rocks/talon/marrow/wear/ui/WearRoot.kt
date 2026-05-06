@@ -1,9 +1,18 @@
 package rocks.talon.marrow.wear.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -22,7 +31,9 @@ import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.EdgeButton
 import androidx.wear.compose.material3.EdgeButtonSize
+import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.ListHeader
+import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.SurfaceTransformation
 import androidx.wear.compose.material3.Text
@@ -33,30 +44,29 @@ import androidx.wear.compose.material3.lazy.transformedHeight
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
+import rocks.talon.marrow.shared.LiveStats
 import rocks.talon.marrow.shared.Row as InfoRow
 import rocks.talon.marrow.shared.Section
+import rocks.talon.marrow.shared.Sections
 import rocks.talon.marrow.wear.WearViewModel
 import rocks.talon.marrow.wear.ui.theme.MarrowWearTheme
 
 /**
  * Root composable for the watch app.
  *
- * Structure mirrors Google's `ComposeStarter` Wear M3 sample:
- *   AppScaffold (provides TimeText to every screen)
+ * Structure mirrors Google's `ComposeStarter` Wear M3 sample, with v0.2.0
+ * additions:
+ *   AppScaffold (TimeText to every screen)
  *     └─ SwipeDismissableNavHost
- *         ├─ "list"   → ScreenScaffold + TransformingLazyColumn of TitleCards
- *         └─ "detail" → ScreenScaffold + TransformingLazyColumn of value Cards
- *
- * The `WearViewModel` is created at activity scope (via the activity-level
- * `LocalViewModelStoreOwner`) so list and detail screens share one snapshot —
- * collection runs once, not per navigation, which was a major source of jank in
- * v0.1.0.
+ *         ├─ "list"   → TransformingLazyColumn of TitleCards (icon + title +
+ *         │             preview); EdgeButton ping/refresh contextual
+ *         └─ "detail/{idx}" → ScreenScaffold + TransformingLazyColumn; for
+ *                             Battery / Memory the hero shows live values
+ *                             refreshed every 10s while composed.
  */
 @Composable
 fun WearRoot() {
     MarrowWearTheme {
-        // Hoist the VM at the activity store owner so every nav destination
-        // observes the same StateFlow.
         val owner = checkNotNull(LocalViewModelStoreOwner.current) {
             "No ViewModelStoreOwner — WearRoot must be hosted by a ComponentActivity."
         }
@@ -68,9 +78,7 @@ fun WearRoot() {
                 navController = nav,
                 startDestination = ROUTE_LIST,
             ) {
-                composable(ROUTE_LIST) {
-                    SectionListScreen(vm = vm, nav = nav)
-                }
+                composable(ROUTE_LIST) { SectionListScreen(vm = vm, nav = nav) }
                 composable("$ROUTE_DETAIL/{idx}") { entry ->
                     val idx = entry.arguments?.getString("idx")?.toIntOrNull() ?: 0
                     SectionDetailScreen(vm = vm, index = idx)
@@ -89,6 +97,8 @@ private const val ROUTE_DETAIL = "detail"
 private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
     val snapshot by vm.snapshot.collectAsState()
     val pingState by vm.pingState.collectAsState()
+    val phoneReachable by vm.phoneReachable.collectAsState()
+    val refreshing by vm.refreshing.collectAsState()
 
     val listState = rememberTransformingLazyColumnState()
     val transformSpec = rememberTransformationSpec()
@@ -99,18 +109,29 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
     ScreenScaffold(
         scrollState = listState,
         edgeButton = {
-            EdgeButton(
-                onClick = { vm.ping() },
-                buttonSize = EdgeButtonSize.Small,
-            ) {
-                Text(
-                    when (pingState) {
-                        WearViewModel.PingState.IDLE -> "Ping phone"
-                        WearViewModel.PingState.SENDING -> "Sending…"
-                        WearViewModel.PingState.SENT -> "Sent"
-                        WearViewModel.PingState.FAILED -> "No phone"
-                    },
-                )
+            // Two contextual actions: when phone unreachable, primary CTA is
+            // "Refresh"; otherwise it's "Ping phone" (debug helper).
+            if (!phoneReachable) {
+                EdgeButton(
+                    onClick = { vm.refresh() },
+                    buttonSize = EdgeButtonSize.Small,
+                ) {
+                    Text(if (refreshing) "Refreshing…" else "Refresh")
+                }
+            } else {
+                EdgeButton(
+                    onClick = { vm.ping() },
+                    buttonSize = EdgeButtonSize.Small,
+                ) {
+                    Text(
+                        when (pingState) {
+                            WearViewModel.PingState.IDLE -> "Ping phone"
+                            WearViewModel.PingState.SENDING -> "Sending…"
+                            WearViewModel.PingState.SENT -> "Sent"
+                            WearViewModel.PingState.FAILED -> "No phone"
+                        },
+                    )
+                }
             }
         },
     ) { contentPadding ->
@@ -125,6 +146,17 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
                         .transformedHeight(this, transformSpec),
                     transformation = SurfaceTransformation(transformSpec),
                 ) { Text("Marrow") }
+            }
+
+            if (!phoneReachable && !isLoading) {
+                item {
+                    DisconnectedNotice(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .transformedHeight(this, transformSpec),
+                        transformation = SurfaceTransformation(transformSpec),
+                    )
+                }
             }
 
             if (isLoading) {
@@ -158,22 +190,56 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
 }
 
 @Composable
+private fun DisconnectedNotice(modifier: Modifier, transformation: SurfaceTransformation) {
+    Card(
+        onClick = {},
+        modifier = modifier,
+        transformation = transformation,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = WearIcons.Phone,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text("Phone disconnected", maxLines = 1)
+                Text(
+                    "Showing cached data",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SectionTitleCard(
     section: Section,
     modifier: Modifier,
     transformation: SurfaceTransformation,
     onClick: () -> Unit,
 ) {
-    // Use the M3 TitleCard from wear-os-samples / ComposeStarter. The title
-    // slot drives typography; subtitle (preview) is rendered as a single line.
     TitleCard(
         onClick = onClick,
-        title = { Text(section.title, maxLines = 1) },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = WearIcons.forSection(section.id),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(section.title, maxLines = 1)
+            }
+        },
         subtitle = if (section.preview.isNotBlank()) {
             { Text(section.preview, maxLines = 1) }
-        } else {
-            null
-        },
+        } else null,
         modifier = modifier,
         transformation = transformation,
     )
@@ -184,12 +250,33 @@ private fun SectionTitleCard(
 @Composable
 private fun SectionDetailScreen(vm: WearViewModel, index: Int) {
     val snapshot by vm.snapshot.collectAsState()
+    val refreshing by vm.refreshing.collectAsState()
     val section = remember(snapshot, index) { snapshot?.sections?.getOrNull(index) }
+
+    // Live polling for Battery and Memory while we're on this screen
+    val needsLive = section?.id == Sections.BATTERY || section?.id == Sections.MEMORY
+    DisposableEffect(needsLive) {
+        if (needsLive) vm.startLive()
+        onDispose { if (needsLive) vm.stopLive() }
+    }
+
+    val battery by vm.battery.collectAsState()
+    val memory by vm.memory.collectAsState()
 
     val listState = rememberTransformingLazyColumnState()
     val transformSpec = rememberTransformationSpec()
 
-    ScreenScaffold(scrollState = listState) { contentPadding ->
+    ScreenScaffold(
+        scrollState = listState,
+        edgeButton = {
+            EdgeButton(
+                onClick = { vm.refresh() },
+                buttonSize = EdgeButtonSize.Small,
+            ) {
+                Text(if (refreshing) "Refreshing…" else "Refresh")
+            }
+        },
+    ) { contentPadding ->
         TransformingLazyColumn(
             state = listState,
             contentPadding = contentPadding,
@@ -201,10 +288,60 @@ private fun SectionDetailScreen(vm: WearViewModel, index: Int) {
                         .transformedHeight(this, transformSpec),
                     transformation = SurfaceTransformation(transformSpec),
                 ) {
-                    Text(
-                        text = section?.title ?: "Detail",
-                        textAlign = TextAlign.Center,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (section != null) {
+                            Icon(
+                                imageVector = WearIcons.forSection(section.id),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                        }
+                        Text(text = section?.title ?: "Detail", textAlign = TextAlign.Center)
+                    }
+                }
+            }
+
+            // Live overlay row for Battery / Memory
+            if (section?.id == Sections.BATTERY && battery != null) {
+                item {
+                    Card(
+                        onClick = {},
+                        modifier = Modifier.fillMaxWidth().transformedHeight(this, transformSpec),
+                        transformation = SurfaceTransformation(transformSpec),
+                    ) {
+                        Column {
+                            Text(
+                                "${battery!!.percent}%",
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                if (battery!!.charging) "Charging" else "Live",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+            if (section?.id == Sections.MEMORY && memory != null) {
+                item {
+                    Card(
+                        onClick = {},
+                        modifier = Modifier.fillMaxWidth().transformedHeight(this, transformSpec),
+                        transformation = SurfaceTransformation(transformSpec),
+                    ) {
+                        Column {
+                            Text(
+                                "${memory!!.usedPercent}% used",
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                "${formatGib(memory!!.usedBytes)} / ${formatGib(memory!!.totalBytes)}",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
 
@@ -213,26 +350,15 @@ private fun SectionDetailScreen(vm: WearViewModel, index: Int) {
                 item {
                     Card(
                         onClick = {},
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .transformedHeight(this, transformSpec),
+                        modifier = Modifier.fillMaxWidth().transformedHeight(this, transformSpec),
                         transformation = SurfaceTransformation(transformSpec),
-                    ) {
-                        Text(
-                            text = if (section == null) "Not available" else "No data",
-                        )
-                    }
+                    ) { Text(if (section == null) "Not available" else "No data") }
                 }
             } else {
-                itemsIndexed(
-                    items = rows,
-                    key = { i, row -> "${row.label}-$i" },
-                ) { _, row ->
+                itemsIndexed(items = rows, key = { i, row -> "${row.label}-$i" }) { _, row ->
                     DetailRowCard(
                         row = row,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .transformedHeight(this@itemsIndexed, transformSpec),
+                        modifier = Modifier.fillMaxWidth().transformedHeight(this@itemsIndexed, transformSpec),
                         transformation = SurfaceTransformation(transformSpec),
                     )
                 }
@@ -247,9 +373,6 @@ private fun DetailRowCard(
     modifier: Modifier,
     transformation: SurfaceTransformation,
 ) {
-    // Wear M3 has no `ListItem`; the canonical 2-line key/value row is a
-    // `TitleCard` with `title = label` + a body line for the value, which
-    // matches the typography Google uses for settings rows in their sample.
     TitleCard(
         onClick = {},
         title = { Text(row.label, maxLines = 1) },
@@ -258,4 +381,13 @@ private fun DetailRowCard(
     ) {
         Text(text = row.value)
     }
+}
+
+private fun formatGib(bytes: Long): String {
+    if (bytes < 1024) return "${bytes} B"
+    val units = arrayOf("KiB", "MiB", "GiB", "TiB")
+    var v = bytes / 1024.0
+    var i = 0
+    while (v >= 1024 && i < units.lastIndex) { v /= 1024.0; i++ }
+    return "%.1f %s".format(v, units[i])
 }
