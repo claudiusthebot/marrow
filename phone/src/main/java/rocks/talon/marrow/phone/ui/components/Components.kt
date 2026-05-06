@@ -1,11 +1,8 @@
 package rocks.talon.marrow.phone.ui.components
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -13,22 +10,24 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,24 +36,97 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/** Card with a subtle scale-on-press + haptic kick. The cornerstone of every
- *  list/grid in the app. */
+/* -------------------------------------------------------------------------- */
+/* Marrow design system — surfaces, tiles, chips, progress, headings.          */
+/*                                                                             */
+/* The vocabulary closely mirrors PixelPlayer's DeviceCapabilitiesScreen so   */
+/* the visual language stays consistent with the reference Dylan called out:  */
+/*                                                                             */
+/*   • CapabilityCard — top-level rounded surface (28dp, surfaceContainer)    */
+/*   • InfoTile      — labelled value cell (18dp, surfaceContainerLow)        */
+/*   • HeroMetricTile — content-centred metric (18dp, tinted container)       */
+/*   • TonalChip     — pill chip (CircleShape, surfaceContainerHighest)       */
+/*   • StatusIcon    — 44dp circle badge for card headers                     */
+/*   • ProgressReadout — label/value row + 8dp progress bar                   */
+/*   • SectionLabel  — semibold titleSmall heading inside a card              */
+/* -------------------------------------------------------------------------- */
+
+/* ---- Cards & surfaces --------------------------------------------------- */
+
+/**
+ * The top-level card every section uses on the home screen and in detail
+ * heroes. 28dp rounded corners, `surfaceContainer` background, no tonal
+ * elevation. Optional press-scale feedback when [onClick] is supplied.
+ */
 @Composable
-fun MarrowCard(
+fun MarrowCapabilityCard(
+    title: String,
+    icon: ImageVector,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    iconContainer: Color = MaterialTheme.colorScheme.secondaryContainer,
+    iconContent: Color = MaterialTheme.colorScheme.onSecondaryContainer,
+    surface: Color = MaterialTheme.colorScheme.surfaceContainer,
+    verticalSpacing: Dp = 12.dp,
+    enableTopSpacer: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    MarrowSurface(
+        modifier = modifier.fillMaxWidth(),
+        surface = surface,
+        cornerRadius = 28.dp,
+        onClick = onClick,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(verticalSpacing),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StatusIcon(icon = icon, container = iconContainer, content = iconContent)
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { heading() },
+                )
+                if (trailing != null) trailing()
+            }
+            if (enableTopSpacer) Spacer(Modifier.height(4.dp))
+            content()
+        }
+    }
+}
+
+/**
+ * Press-scale wrapper used by all clickable surfaces. Adds a subtle scale +
+ * haptic kick when [onClick] is set.
+ */
+@Composable
+fun MarrowSurface(
+    modifier: Modifier = Modifier,
+    surface: Color = MaterialTheme.colorScheme.surfaceContainer,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(28.dp),
+    cornerRadius: Dp = 28.dp,
+    onClick: (() -> Unit)? = null,
     interaction: MutableInteractionSource = remember { MutableInteractionSource() },
     content: @Composable () -> Unit,
 ) {
@@ -69,6 +141,7 @@ fun MarrowCard(
     )
     val haptic = LocalHapticFeedback.current
     val mod = modifier.scale(scale)
+    val shape = RoundedCornerShape(cornerRadius)
     if (onClick != null) {
         Card(
             onClick = {
@@ -77,41 +150,278 @@ fun MarrowCard(
             },
             modifier = mod,
             shape = shape,
-            colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
+            colors = CardDefaults.cardColors(containerColor = surface, contentColor = contentColor),
             interactionSource = interaction,
         ) { content() }
     } else {
-        Card(
-            modifier = mod,
-            shape = shape,
-            colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
-        ) { content() }
+        Surface(modifier = mod, shape = shape, color = surface, contentColor = contentColor) {
+            content()
+        }
     }
 }
 
-/** A row of section heading + optional trailing slot. Title + subtitle. */
+/** Backwards-compat shim for older code that called `MarrowCard`. */
 @Composable
-fun SectionTitle(
+fun MarrowCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    cornerRadius: Dp = 28.dp,
+    content: @Composable () -> Unit,
+) = MarrowSurface(
+    modifier = modifier,
+    surface = containerColor,
+    contentColor = contentColor,
+    cornerRadius = cornerRadius,
+    onClick = onClick,
+    content = content,
+)
+
+/* ---- Status icon, used as the leading badge on every card header -------- */
+
+@Composable
+fun StatusIcon(
+    icon: ImageVector,
+    container: Color = MaterialTheme.colorScheme.secondaryContainer,
+    content: Color = MaterialTheme.colorScheme.onSecondaryContainer,
+    modifier: Modifier = Modifier,
+    size: Dp = 44.dp,
+    iconSize: Dp = 22.dp,
+) {
+    Surface(
+        modifier = modifier.size(size),
+        shape = CircleShape,
+        color = container,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = content,
+                modifier = Modifier.size(iconSize),
+            )
+        }
+    }
+}
+
+/* ---- Info tile — a labelled value cell ---------------------------------- */
+
+@Composable
+fun InfoTile(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    supporting: String? = null,
+    icon: ImageVector? = null,
+    container: Color = MaterialTheme.colorScheme.surfaceContainerLow,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxHeight()
+            .defaultMinSize(minHeight = 86.dp),
+        shape = RoundedCornerShape(18.dp),
+        color = container,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                icon?.let {
+                    Icon(
+                        imageVector = it,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (supporting != null) {
+                Text(
+                    text = supporting,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/* ---- Hero metric tile — used in hero rows -------------------------------- */
+
+@Composable
+fun HeroMetricTile(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    container: Color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f),
+    contentColor: Color = MaterialTheme.colorScheme.onPrimaryContainer,
+    minHeight: Dp = 82.dp,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxHeight()
+            .defaultMinSize(minHeight = minHeight),
+        shape = RoundedCornerShape(18.dp),
+        color = container,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = contentColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = contentColor.copy(alpha = 0.78f),
+                maxLines = 2,
+                textAlign = TextAlign.Center,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/* ---- Tonal chip — pill ----------------------------------------------- */
+
+@Composable
+fun TonalChip(
+    text: String,
+    modifier: Modifier = Modifier,
+    leadingIcon: ImageVector? = null,
+    compact: Boolean = false,
+    container: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    onClick: (() -> Unit)? = null,
+) {
+    Surface(
+        modifier = modifier.then(
+            if (onClick != null) Modifier.clickable { onClick() } else Modifier,
+        ),
+        shape = CircleShape,
+        color = container,
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = if (compact) 10.dp else 12.dp,
+                vertical = if (compact) 5.dp else 8.dp,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            leadingIcon?.let {
+                Icon(
+                    imageVector = it,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(if (compact) 14.dp else 16.dp),
+                )
+            }
+            Text(
+                text = text,
+                style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+                color = contentColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/* ---- Progress readout ---------------------------------------------------- */
+
+@Composable
+fun ProgressReadout(
+    label: String,
+    value: String,
+    progress: Float,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary,
+) {
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        LinearProgressIndicator(
+            progress = { progress.coerceIn(0f, 1f).let { if (it > 0f && it < 0.01f) 0.01f else it } },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(CircleShape),
+            color = color,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        )
+    }
+}
+
+/* ---- Headings ------------------------------------------------------------ */
+
+/** Title row for the home screen. titleLarge semibold + optional subtitle. */
+@Composable
+fun ScreenSectionTitle(
     title: String,
     subtitle: String? = null,
     modifier: Modifier = Modifier,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
             Text(
-                title,
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
             )
             if (!subtitle.isNullOrBlank()) {
                 Text(
-                    subtitle,
+                    text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -121,69 +431,57 @@ fun SectionTitle(
     }
 }
 
-/** Big rounded icon badge — used on cards and section heroes. */
+/** Sub-heading inside a card. Bolded titleSmall. */
+@Composable
+fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = modifier.semantics { heading() },
+    )
+}
+
+/* ---- Backwards-compat ---------------------------------------------------- */
+
+/** Old name kept so other files compile — delegates to ScreenSectionTitle. */
+@Composable
+fun SectionTitle(
+    title: String,
+    subtitle: String? = null,
+    modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null,
+) = ScreenSectionTitle(title = title, subtitle = subtitle, modifier = modifier, trailing = trailing)
+
+/** Tonal-elevation badge that older detail screens use. Kept lean. */
 @Composable
 fun IconBadge(
     icon: ImageVector,
     modifier: Modifier = Modifier,
     size: Int = 44,
-    container: Color = MaterialTheme.colorScheme.primaryContainer,
-    content: Color = MaterialTheme.colorScheme.onPrimaryContainer,
-    cornerRadius: Int = 14,
+    container: Color = MaterialTheme.colorScheme.secondaryContainer,
+    content: Color = MaterialTheme.colorScheme.onSecondaryContainer,
+    cornerRadius: Int = 22,
 ) {
     Box(
         modifier = modifier
             .size(size.dp)
-            .clip(RoundedCornerShape(cornerRadius.dp))
+            .clip(if (cornerRadius >= size / 2) CircleShape else RoundedCornerShape(cornerRadius.dp))
             .background(container),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size((size * 0.55f).dp))
-    }
-}
-
-/** A pill-shaped chip used for the live stats strip. */
-@Composable
-fun LiveStatChip(
-    label: String,
-    value: String,
-    icon: ImageVector,
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-) {
-    val container = MaterialTheme.colorScheme.surfaceContainerHigh
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(container)
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconBadge(
-            icon = icon,
-            size = 28,
-            cornerRadius = 8,
-            container = MaterialTheme.colorScheme.primaryContainer,
-            content = MaterialTheme.colorScheme.onPrimaryContainer,
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = content,
+            modifier = Modifier.size((size * 0.50f).dp),
         )
-        Spacer(Modifier.width(10.dp))
-        Column {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                value,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
     }
 }
 
-/** Key/value row — used in section detail bodies. */
+/** Key/value row used by section detail bodies — sits on `surfaceContainer`
+ *  so it inherits whatever card it's nested in. Tap-to-copy supported. */
 @Composable
 fun KeyValueRow(
     label: String,
@@ -196,16 +494,16 @@ fun KeyValueRow(
         modifier = modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Text(
-            label,
+            text = label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(2.dp))
         Text(
-            value,
+            text = value,
             style = if (monospaceValue) MaterialTheme.typography.labelSmall.copy(
                 fontSize = MaterialTheme.typography.bodyMedium.fontSize,
                 fontWeight = FontWeight.Medium,
@@ -215,7 +513,24 @@ fun KeyValueRow(
     }
 }
 
-/** A plain section card — icon badge + title + preview text + optional live preview. */
+/** Small live-stat chip that older tabs may still reference. */
+@Composable
+fun LiveStatChip(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) = HeroMetricTile(
+    label = label,
+    value = value,
+    modifier = modifier
+        .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
+    container = MaterialTheme.colorScheme.surfaceContainerLow,
+    contentColor = MaterialTheme.colorScheme.onSurface,
+)
+
+/** Old SectionGridCard reference — same layout but now full-width and PixelPlayer-styled. */
 @Composable
 fun SectionGridCard(
     title: String,
@@ -225,45 +540,33 @@ fun SectionGridCard(
     secondary: String? = null,
     onClick: () -> Unit,
 ) {
-    MarrowCard(
-        modifier = modifier.fillMaxWidth(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+    MarrowCapabilityCard(
+        title = title,
+        icon = icon,
         onClick = onClick,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconBadge(icon = icon, size = 40, cornerRadius = 12)
-                Spacer(Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(2.dp))
-            Text(
-                title,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (livePreview != null) {
+        modifier = modifier,
+        verticalSpacing = 8.dp,
+        trailing = {
+            if (!livePreview.isNullOrBlank()) {
                 Text(
-                    livePreview,
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    text = livePreview,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (secondary != null) {
-                Text(
-                    secondary,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+        },
+    ) {
+        if (!secondary.isNullOrBlank()) {
+            Text(
+                text = secondary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
