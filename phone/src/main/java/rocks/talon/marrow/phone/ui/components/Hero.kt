@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,6 +23,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 import rocks.talon.marrow.phone.ui.icons.MarrowIcons
 
 /* -------------------------------------------------------------------------- */
@@ -33,6 +33,10 @@ import rocks.talon.marrow.phone.ui.icons.MarrowIcons
 /* with a header row (StatusIcon + headline + supporting line) and a tile     */
 /* row of three metric pills below. No gradients, no custom mascots — the    */
 /* device name is the show.                                                  */
+/*                                                                             */
+/* Shape: AbsoluteSmoothCornerShape(32.dp, 60) — slightly larger radius than  */
+/* the capability cards (28dp) to give the hero its own visual weight, same   */
+/* smoothness as the rest of the design system.                               */
 /* -------------------------------------------------------------------------- */
 
 /**
@@ -57,7 +61,7 @@ fun MarrowHero(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(32.dp),
+        shape = AbsoluteSmoothCornerShape(32.dp, 60),
         color = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
     ) {
