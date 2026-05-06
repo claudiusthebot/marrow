@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat
 import rocks.talon.marrow.phone.ui.MarrowApp
 
 class MainActivity : ComponentActivity() {
@@ -15,12 +16,12 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent { MarrowApp(vm) }
     }
 
     override fun onResume() {
         super.onResume()
-        // Refresh both panes on resume so values stay live.
         vm.refreshPhone()
         vm.requestWatchInfo()
     }

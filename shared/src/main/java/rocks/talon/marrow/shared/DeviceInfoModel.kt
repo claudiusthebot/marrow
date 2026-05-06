@@ -45,6 +45,7 @@ object Sections {
     const val SENSORS = "sensors"
     const val CAMERAS = "cameras"
     const val BUILD_FLAGS = "build_flags"
+    const val SOFTWARE = "software"
 }
 
 object MarrowPaths {

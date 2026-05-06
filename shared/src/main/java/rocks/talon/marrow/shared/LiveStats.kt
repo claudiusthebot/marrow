@@ -1,0 +1,170 @@
+package rocks.talon.marrow.shared
+
+import android.app.ActivityManager
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import android.os.Environment
+import android.os.StatFs
+import java.io.File
+
+/**
+ * Lightweight, polled snapshots of the device's most-watched stats. Designed
+ * for the phone's "live stats strip" + per-section hero treatments — they update
+ * every few seconds and need numeric values, not pre-formatted strings.
+ *
+ * Every call is safe on a missing-hardware device: each accessor returns a
+ * sentinel when it can't read the value, never throws.
+ */
+object LiveStats {
+
+    // -- Battery -----------------------------------------------------------------
+
+    data class Battery(
+        val percent: Int,                 // 0..100, -1 unknown
+        val charging: Boolean,
+        val plugged: PlugType,
+        val temperatureC: Float,          // -1f unknown
+        val voltageV: Float,              // -1f unknown
+        val currentMa: Int,               // Int.MIN_VALUE unknown
+        val technology: String,
+        val healthy: Boolean,
+    ) {
+        enum class PlugType { UNPLUGGED, AC, USB, WIRELESS, DOCK }
+    }
+
+    fun battery(context: Context): Battery {
+        val intent: Intent? = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val mgr = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        val percent = if (level >= 0 && scale > 0) (level * 100f / scale).toInt() else -1
+        val statusInt = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val charging = statusInt == BatteryManager.BATTERY_STATUS_CHARGING ||
+            statusInt == BatteryManager.BATTERY_STATUS_FULL
+        val pluggedInt = intent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
+        val plug = when (pluggedInt) {
+            BatteryManager.BATTERY_PLUGGED_AC -> Battery.PlugType.AC
+            BatteryManager.BATTERY_PLUGGED_USB -> Battery.PlugType.USB
+            BatteryManager.BATTERY_PLUGGED_WIRELESS -> Battery.PlugType.WIRELESS
+            BatteryManager.BATTERY_PLUGGED_DOCK -> Battery.PlugType.DOCK
+            else -> Battery.PlugType.UNPLUGGED
+        }
+        val tempTenths = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1) ?: -1
+        val voltageMv = intent?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1) ?: -1
+        val healthInt = intent?.getIntExtra(BatteryManager.EXTRA_HEALTH, -1) ?: -1
+        val tech = intent?.getStringExtra(BatteryManager.EXTRA_TECHNOLOGY) ?: "?"
+        val current = mgr?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) ?: Int.MIN_VALUE
+        return Battery(
+            percent = percent,
+            charging = charging,
+            plugged = plug,
+            temperatureC = if (tempTenths >= 0) tempTenths / 10f else -1f,
+            voltageV = if (voltageMv >= 0) voltageMv / 1000f else -1f,
+            currentMa = if (current != Int.MIN_VALUE) current / 1000 else Int.MIN_VALUE,
+            technology = tech,
+            healthy = healthInt == BatteryManager.BATTERY_HEALTH_GOOD || healthInt == -1,
+        )
+    }
+
+    // -- Memory ------------------------------------------------------------------
+
+    data class Memory(
+        val totalBytes: Long,
+        val availBytes: Long,
+        val thresholdBytes: Long,
+        val lowMemory: Boolean,
+    ) {
+        val usedBytes: Long get() = (totalBytes - availBytes).coerceAtLeast(0L)
+        val usedFraction: Float
+            get() = if (totalBytes > 0) (usedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f) else 0f
+        val usedPercent: Int get() = (usedFraction * 100f).toInt()
+    }
+
+    fun memory(context: Context): Memory {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val mi = ActivityManager.MemoryInfo()
+        am.getMemoryInfo(mi)
+        return Memory(mi.totalMem, mi.availMem, mi.threshold, mi.lowMemory)
+    }
+
+    // -- CPU ---------------------------------------------------------------------
+
+    data class CpuCore(val index: Int, val curMhz: Long, val minMhz: Long, val maxMhz: Long, val governor: String?)
+
+    /** Reads /sys per-core frequencies. Cheap; safe on hardware where the files
+     *  aren't readable (returns 0 for that core's freq). */
+    fun cpuCores(): List<CpuCore> {
+        val cores = Runtime.getRuntime().availableProcessors()
+        return (0 until cores).map { i ->
+            val cur = readLong("/sys/devices/system/cpu/cpu$i/cpufreq/scaling_cur_freq") / 1000
+            val min = readLong("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_min_freq") / 1000
+            val max = readLong("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_max_freq") / 1000
+            val gov = readString("/sys/devices/system/cpu/cpu$i/cpufreq/scaling_governor")
+            CpuCore(i, cur, min, max, gov)
+        }
+    }
+
+    fun avgCurMhz(cores: List<CpuCore>): Long {
+        val active = cores.filter { it.curMhz > 0 }
+        if (active.isEmpty()) return 0L
+        return active.sumOf { it.curMhz } / active.size
+    }
+
+    // -- Storage -----------------------------------------------------------------
+
+    data class Volume(
+        val label: String,
+        val totalBytes: Long,
+        val availBytes: Long,
+    ) {
+        val usedBytes: Long get() = (totalBytes - availBytes).coerceAtLeast(0L)
+        val usedFraction: Float
+            get() = if (totalBytes > 0) (usedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f) else 0f
+    }
+
+    fun volumes(): List<Volume> {
+        val out = mutableListOf<Volume>()
+        runCatching {
+            val internalRoot = Environment.getDataDirectory()
+            val s = StatFs(internalRoot.path)
+            out += Volume(
+                label = "Internal",
+                totalBytes = s.blockCountLong * s.blockSizeLong,
+                availBytes = s.availableBlocksLong * s.blockSizeLong,
+            )
+        }
+        runCatching {
+            val ext = Environment.getExternalStorageDirectory()
+            val s = StatFs(ext.path)
+            val total = s.blockCountLong * s.blockSizeLong
+            // Only add if it looks distinct from /data — most modern Android phones
+            // share emulated storage with /data so the numbers are equal.
+            val internalSize = out.firstOrNull()?.totalBytes ?: 0L
+            if (total > 0 && total != internalSize) {
+                out += Volume(
+                    label = "External",
+                    totalBytes = total,
+                    availBytes = s.availableBlocksLong * s.blockSizeLong,
+                )
+            }
+        }
+        return out
+    }
+
+    fun storageUsedFraction(volumes: List<Volume>): Float {
+        val total = volumes.sumOf { it.totalBytes }
+        if (total <= 0) return 0f
+        val used = volumes.sumOf { it.usedBytes }
+        return (used.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+    }
+
+    // -- helpers -----------------------------------------------------------------
+
+    private fun readLong(path: String): Long =
+        runCatching { File(path).readText().trim().toLong() }.getOrDefault(0L)
+
+    private fun readString(path: String): String? =
+        runCatching { File(path).readText().trim() }.getOrNull()
+}
