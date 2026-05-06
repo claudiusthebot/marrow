@@ -123,7 +123,7 @@ private fun MarrowBottomBar(active: String, onTab: (String) -> Unit) {
         tonalElevation = 0.dp,
     ) {
         NavBarTab(active, Routes.DEVICE, "Device", MarrowIcons.Device, onTab)
-        NavBarTab(active, Routes.WATCH, "Watch", rocks.talon.marrow.phone.ui.icons.MarrowWatchGlyph, onTab)
+        NavBarTab(active, Routes.WATCH, "Watch", MarrowIcons.Watch, onTab)
         NavBarTab(active, Routes.ABOUT, "About", MarrowIcons.Wordmark, onTab)
     }
 }

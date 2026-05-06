@@ -248,6 +248,3 @@ object MarrowIcons {
     }
 }
 
-/** Top-level alias used by the bottom-nav so the import line stays short. */
-val MarrowWatchGlyph = MarrowIcons.Watch
-
