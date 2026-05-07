@@ -159,6 +159,7 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
 @Composable
 fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val cores by vm.cpuCores.collectAsState()
+    val cpuTempC by vm.cpuTempC.collectAsState()
     val coreCount = section.rows.firstOrNull { it.label == "Cores" }?.value?.toIntOrNull() ?: cores.size
     val abis = section.rows.firstOrNull { it.label == "ABIs" }?.value
         ?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
@@ -174,9 +175,13 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                         "$coreCount cores",
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     )
-                    if (governor != null) {
+                    val subtitle = buildList {
+                        if (governor != null) add("Governor · $governor")
+                        if (!isWatch && cpuTempC >= 0f) add("%.1f °C".format(cpuTempC))
+                    }.joinToString("  ·  ")
+                    if (subtitle.isNotBlank()) {
                         Text(
-                            "Governor · $governor",
+                            subtitle,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
