@@ -25,8 +25,8 @@ import rocks.talon.marrow.shared.LiveStats
  * App-wide state holder.
  *
  * - **Snapshot** for the phone (full collector dump) and watch (cached/live).
- * - **Live stats** (battery / memory / cpu / storage) polled every refresh
- *   interval — used by the Device tab's hero/strip and the per-section heroes.
+ * - **Live stats** (battery / memory / cpu / storage / cpu-temp) polled every
+ *   refresh interval — used by the Device tab's hero/strip and per-section heroes.
  * - **Settings** stream from DataStore so the theme/interval react to changes.
  */
 class MarrowViewModel(app: Application) : AndroidViewModel(app) {
@@ -63,6 +63,11 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _volumes = MutableStateFlow<List<LiveStats.Volume>>(emptyList())
     val volumes: StateFlow<List<LiveStats.Volume>> = _volumes.asStateFlow()
+
+    /** CPU / SoC die temperature in °C. -1f when unavailable (emulator, restricted
+     *  SELinux, device without accessible thermal_zone sysfs nodes). */
+    private val _cpuTempC = MutableStateFlow(-1f)
+    val cpuTempC: StateFlow<Float> = _cpuTempC.asStateFlow()
 
     // -- Settings ----------------------------------------------------------------
 
@@ -126,6 +131,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _memory.value = LiveStats.memory(ctx)
                 _cpuCores.value = LiveStats.cpuCores()
                 _volumes.value = LiveStats.volumes()
+                _cpuTempC.value = LiveStats.cpuTempC()
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }

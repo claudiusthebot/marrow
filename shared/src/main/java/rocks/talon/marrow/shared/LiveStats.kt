@@ -112,6 +112,29 @@ object LiveStats {
         return active.sumOf { it.curMhz } / active.size
     }
 
+    /** Reads the highest CPU / SoC thermal zone temperature in °C.
+     *
+     *  Scans `/sys/class/thermal/thermal_zone*` and filters zones whose `type`
+     *  file contains "cpu" or "soc" (case-insensitive). Vendor type strings vary:
+     *  "CPU-therm", "cpu0", "tsens_tz_sensor0", "SoC-therm", "CPU_therm"…
+     *
+     *  Returns the maximum of all matching zone temperatures, converted from
+     *  millidegrees to °C. Returns -1f when the sysfs path is absent or no
+     *  CPU/SoC zones are readable (e.g. emulator, restricted SELinux policy). */
+    fun cpuTempC(): Float {
+        val thermalRoot = File("/sys/class/thermal")
+        if (!thermalRoot.exists()) return -1f
+        val temps = thermalRoot.listFiles { f ->
+            f.isDirectory && f.name.startsWith("thermal_zone")
+        }?.mapNotNull { zone ->
+            val type = readString("${zone.path}/type")?.lowercase() ?: return@mapNotNull null
+            if (!type.contains("cpu") && !type.contains("soc")) return@mapNotNull null
+            readLong("${zone.path}/temp").takeIf { it > 0L }
+        }.orEmpty()
+        if (temps.isEmpty()) return -1f
+        return temps.max() / 1000f
+    }
+
     // -- Storage -----------------------------------------------------------------
 
     data class Volume(
