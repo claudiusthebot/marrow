@@ -455,11 +455,12 @@ fun DisplayHero(section: Section) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun NetworkHero(section: Section) {
+fun NetworkHero(vm: MarrowViewModel, section: Section) {
     val transport = section.rows.firstOrNull { it.label == "Connection" }?.value ?: "—"
     val carrier = section.rows.firstOrNull { it.label == "Carrier" }?.value
     val ssid = section.rows.firstOrNull { it.label == "Wi-Fi SSID" }?.value
     val rssi = section.rows.firstOrNull { it.label == "Wi-Fi RSSI" }?.value
+    val (rxBps, txBps) by vm.networkRate.collectAsState()
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -476,8 +477,16 @@ fun NetworkHero(section: Section) {
                 }
             }
             if (rssi != null) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(8.dp))
                 AssistChip(onClick = {}, label = { Text("RSSI $rssi") })
+            }
+            // Live throughput — shown after the first two polling ticks provide a rate
+            if (rxBps > 0L || txBps > 0L) {
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    BigStat("↓ Download", LiveStats.formatSpeedBps(rxBps))
+                    BigStat("↑ Upload", LiveStats.formatSpeedBps(txBps))
+                }
             }
         }
     }
