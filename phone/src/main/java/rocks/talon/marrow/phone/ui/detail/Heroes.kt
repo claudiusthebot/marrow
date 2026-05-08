@@ -165,6 +165,17 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
         ?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
     val governor = cores.firstOrNull { it.governor != null }?.governor
 
+    // Temperature color: mirrors BatteryHero tint thresholds.
+    // Green  < 60 °C — normal operating range.
+    // Orange 60–79 °C — warm, worth watching.
+    // Red   ≥ 80 °C — hot, potential throttling territory.
+    val tempColor = when {
+        cpuTempC < 0f -> Color.Unspecified         // unavailable — not shown
+        cpuTempC >= 80f -> Color(0xFFE53935)        // red
+        cpuTempC >= 60f -> Color(0xFFFFA726)        // orange
+        else -> Color(0xFF66BB6A)                   // green
+    }
+
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -175,15 +186,18 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                         "$coreCount cores",
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     )
-                    val subtitle = buildList {
-                        if (governor != null) add("Governor · $governor")
-                        if (!isWatch && cpuTempC >= 0f) add("%.1f °C".format(cpuTempC))
-                    }.joinToString("  ·  ")
-                    if (subtitle.isNotBlank()) {
+                    if (governor != null) {
                         Text(
-                            subtitle,
+                            "Governor · $governor",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (!isWatch && cpuTempC >= 0f) {
+                        Text(
+                            "%.1f °C".format(cpuTempC),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = tempColor,
                         )
                     }
                 }
