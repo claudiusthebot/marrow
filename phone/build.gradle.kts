@@ -69,6 +69,12 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.core:core-splashscreen:1.0.1")
 
+    // Squircle shapes — smooth superellipse corners that match PixelPlayer's visual
+    // language. AbsoluteSmoothCornerShape(28.dp, 60) for capability cards;
+    // (18.dp, 60) for info/hero metric tiles; (32.dp, 60) for the hero banner.
+    // Library: https://github.com/racra/smooth-corner-rect-library
+    implementation("io.github.racra:smooth-corner-rect-library:1.0.4")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")
