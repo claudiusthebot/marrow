@@ -373,6 +373,9 @@ private fun LegendDot(color: Color, label: String) {
 @Composable
 fun StorageHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val volumes by vm.volumes.collectAsState()
+    val diskRate by vm.diskRate.collectAsState()
+    val (readBps, writeBps) = diskRate
+
     val volumeList = if (isWatch || volumes.isEmpty()) {
         // Reconstruct from rows
         val total = parseBytes(section.rows.firstOrNull { it.label == "Internal — total" }?.value)
@@ -392,6 +395,21 @@ fun StorageHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
             if (volumeList.isEmpty()) {
                 Text("Storage info unavailable.", style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            // Live I/O rates — shown after first full tick, phone only
+            if (!isWatch && (readBps > 0L || writeBps > 0L)) {
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        BigStat("↓ Read", LiveStats.formatDiskBps(readBps))
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        BigStat("↑ Write", LiveStats.formatDiskBps(writeBps))
+                    }
+                }
             }
         }
     }
