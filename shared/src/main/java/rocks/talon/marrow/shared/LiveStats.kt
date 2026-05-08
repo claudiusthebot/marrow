@@ -232,6 +232,63 @@ object LiveStats {
         else                     -> "$bytesPerSec B/s"
     }
 
+    // -- Disk I/O ----------------------------------------------------------------
+
+    data class DiskSnapshot(
+        val readSectors: Long,
+        val writeSectors: Long,
+        val timestampMs: Long,
+    )
+
+    /**
+     * Reads /proc/diskstats to get cumulative sector counts across top-level
+     * block devices. Skips loop, ram, zram, dm-*, sr devices and partition
+     * subdevices (e.g. mmcblk0p1, sda1). Returns null when the file can't
+     * be read (SELinux restriction or sandboxed environment).
+     *
+     * /proc/diskstats column layout (0-indexed):
+     *   2=device name, 5=sectors_read, 9=sectors_written. Each sector = 512 B.
+     */
+    fun diskSnapshot(): DiskSnapshot? = runCatching {
+        val lines = File("/proc/diskstats").readLines()
+        var readSectors = 0L
+        var writeSectors = 0L
+        for (line in lines) {
+            val parts = line.trim().split(Regex("\\s+"))
+            if (parts.size < 10) continue
+            val name = parts[2]
+            // Skip virtual / noise devices
+            if (name.matches(Regex("(loop|ram|zram|dm-|sr)\\d*.*"))) continue
+            // Skip partition subdevices
+            if (name.matches(Regex("mmcblk\\d+p\\d+.*"))) continue
+            if (name.matches(Regex("nvme\\d+n\\d+p\\d+.*"))) continue
+            if (name.matches(Regex("sd[a-z]\\d+.*"))) continue
+            if (name.matches(Regex("vd[a-z]\\d+.*"))) continue
+            readSectors += parts[5].toLongOrNull() ?: 0L
+            writeSectors += parts[9].toLongOrNull() ?: 0L
+        }
+        DiskSnapshot(readSectors, writeSectors, System.currentTimeMillis())
+    }.getOrNull()
+
+    /**
+     * Returns (readBps, writeBps) from two consecutive [DiskSnapshot]s.
+     * Returns (0, 0) if elapsed time is zero or negative.
+     */
+    fun diskRate(prev: DiskSnapshot, curr: DiskSnapshot): Pair<Long, Long> {
+        val elapsedMs = curr.timestampMs - prev.timestampMs
+        if (elapsedMs <= 0L) return 0L to 0L
+        val readBps = ((curr.readSectors - prev.readSectors).coerceAtLeast(0L) * 512L * 1000L) / elapsedMs
+        val writeBps = ((curr.writeSectors - prev.writeSectors).coerceAtLeast(0L) * 512L * 1000L) / elapsedMs
+        return readBps to writeBps
+    }
+
+    /** Formats a byte-per-second disk rate as a concise human-readable string. */
+    fun formatDiskBps(bytesPerSec: Long): String = when {
+        bytesPerSec >= 1_000_000L -> "%.1f MB/s".format(bytesPerSec / 1_000_000.0)
+        bytesPerSec >= 1_000L -> "${bytesPerSec / 1_000} KB/s"
+        else -> "$bytesPerSec B/s"
+    }
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =

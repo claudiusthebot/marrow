@@ -25,8 +25,8 @@ import rocks.talon.marrow.shared.LiveStats
  * App-wide state holder.
  *
  * - **Snapshot** for the phone (full collector dump) and watch (cached/live).
- * - **Live stats** (battery / memory / cpu / storage / cpu-temp) polled every
- *   refresh interval — used by the Device tab's hero/strip and per-section heroes.
+ * - **Live stats** (battery / memory / cpu / storage / cpu-temp / network / disk I/O)
+ *   polled every refresh interval — used by the Device tab's hero/strip and per-section heroes.
  * - **Settings** stream from DataStore so the theme/interval react to changes.
  */
 class MarrowViewModel(app: Application) : AndroidViewModel(app) {
@@ -74,6 +74,12 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
      *  SELinux, device without accessible thermal_zone sysfs nodes). */
     private val _cpuTempC = MutableStateFlow(-1f)
     val cpuTempC: StateFlow<Float> = _cpuTempC.asStateFlow()
+
+    /** Live disk I/O rate as (readBytesPerSec, writeBytesPerSec). Same delta pattern as
+     *  network — needs two snapshots for first rate. */
+    private val _diskRate = MutableStateFlow(0L to 0L)
+    val diskRate: StateFlow<Pair<Long, Long>> = _diskRate.asStateFlow()
+    private var prevDiskSnapshot: LiveStats.DiskSnapshot? = null
 
     // -- Settings ----------------------------------------------------------------
 
@@ -143,6 +149,13 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 prevNetSnapshot = netSnap
                 _cpuTempC.value = LiveStats.cpuTempC()
+                // Disk I/O: two-snapshot delta pattern
+                val diskSnap = LiveStats.diskSnapshot()
+                val prevSnap = prevDiskSnapshot
+                if (diskSnap != null && prevSnap != null) {
+                    _diskRate.value = LiveStats.diskRate(prevSnap, diskSnap)
+                }
+                if (diskSnap != null) prevDiskSnapshot = diskSnap
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }
