@@ -160,6 +160,55 @@ object LiveStats {
         return (used.toFloat() / total.toFloat()).coerceIn(0f, 1f)
     }
 
+    // -- Network speed -----------------------------------------------------------
+
+    data class NetworkSpeed(
+        val rxBytesTotal: Long,
+        val txBytesTotal: Long,
+        val timestampMs: Long,
+    )
+
+    /**
+     * Snapshot of all network-interface byte counters (loopback excluded).
+     * Reads /proc/net/dev — no I/O blocking, safe on all API levels.
+     */
+    fun networkSnapshot(): NetworkSpeed {
+        var rxTotal = 0L
+        var txTotal = 0L
+        runCatching {
+            File("/proc/net/dev").forEachLine { line ->
+                val trimmed = line.trim()
+                // Skip header lines and loopback
+                if (trimmed.startsWith("Inter") || trimmed.startsWith("face") ||
+                    trimmed.startsWith("lo:")) return@forEachLine
+                val colon = trimmed.indexOf(':')
+                if (colon < 0) return@forEachLine
+                // Columns: rx_bytes packets errs drop fifo frame compressed multicast
+                //          tx_bytes packets errs drop fifo colls carrier compressed
+                val parts = trimmed.substring(colon + 1).trim().split(Regex("\\s+"))
+                rxTotal += parts.getOrNull(0)?.toLongOrNull() ?: 0L
+                txTotal += parts.getOrNull(8)?.toLongOrNull() ?: 0L
+            }
+        }
+        return NetworkSpeed(rxTotal, txTotal, System.currentTimeMillis())
+    }
+
+    /** Returns (rxBytesPerSec, txBytesPerSec) from two consecutive snapshots. */
+    fun networkRate(prev: NetworkSpeed, curr: NetworkSpeed): Pair<Long, Long> {
+        val dtMs = curr.timestampMs - prev.timestampMs
+        if (dtMs <= 0L) return 0L to 0L
+        val rxRate = ((curr.rxBytesTotal - prev.rxBytesTotal) * 1000L / dtMs).coerceAtLeast(0L)
+        val txRate = ((curr.txBytesTotal - prev.txBytesTotal) * 1000L / dtMs).coerceAtLeast(0L)
+        return rxRate to txRate
+    }
+
+    /** Human-readable byte rate: "1.2 MB/s", "345 KB/s", "12 B/s". */
+    fun formatSpeedBps(bytesPerSec: Long): String = when {
+        bytesPerSec >= 1_000_000L -> "%.1f MB/s".format(bytesPerSec / 1_000_000f)
+        bytesPerSec >= 1_000L    -> "${bytesPerSec / 1_000} KB/s"
+        else                     -> "$bytesPerSec B/s"
+    }
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =

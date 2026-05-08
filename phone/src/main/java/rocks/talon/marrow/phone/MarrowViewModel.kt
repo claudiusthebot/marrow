@@ -64,6 +64,12 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _volumes = MutableStateFlow<List<LiveStats.Volume>>(emptyList())
     val volumes: StateFlow<List<LiveStats.Volume>> = _volumes.asStateFlow()
 
+    /** Live network throughput as (rxBytesPerSec, txBytesPerSec). Starts at 0/0 until the
+     *  second polling tick — one snapshot is needed for baseline, two for a rate. */
+    private val _networkRate = MutableStateFlow<Pair<Long, Long>>(0L to 0L)
+    val networkRate: StateFlow<Pair<Long, Long>> = _networkRate.asStateFlow()
+    private var prevNetSnapshot: LiveStats.NetworkSpeed? = null
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -126,6 +132,11 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _memory.value = LiveStats.memory(ctx)
                 _cpuCores.value = LiveStats.cpuCores()
                 _volumes.value = LiveStats.volumes()
+                val netSnap = LiveStats.networkSnapshot()
+                prevNetSnapshot?.let { prev ->
+                    _networkRate.value = LiveStats.networkRate(prev, netSnap)
+                }
+                prevNetSnapshot = netSnap
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }
