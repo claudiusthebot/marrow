@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilledTonalButton
@@ -29,14 +29,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import rocks.talon.marrow.phone.MarrowViewModel
-import rocks.talon.marrow.phone.ui.components.MarrowHero
+import rocks.talon.marrow.phone.ui.components.CollapsibleTopBar
 import rocks.talon.marrow.phone.ui.components.LiveStatsStrip
 import rocks.talon.marrow.phone.ui.components.MarrowCapabilityCard
+import rocks.talon.marrow.phone.ui.components.MarrowHero
 import rocks.talon.marrow.phone.ui.components.ScreenSectionTitle
+import rocks.talon.marrow.phone.ui.components.rememberCollapsibleTopBarState
 import rocks.talon.marrow.phone.ui.icons.MarrowIcons
 import rocks.talon.marrow.shared.DeviceInfoSnapshot
 import rocks.talon.marrow.shared.LiveStats
@@ -46,20 +50,14 @@ import rocks.talon.marrow.shared.Sections
 /**
  * Device tab.
  *
- * Single `LazyColumn` host. ALL horizontal inset comes from the column's
- * `contentPadding` — no per-item `Modifier.padding(horizontal = …)` anywhere
- * in this file. That's the rule that fixes the v0.2 padding inconsistency
- * Dylan called out: every card, hero, strip, title and footer aligns to the
- * same screen edges.
- *
- * Layout (top to bottom):
- *   1. MarrowHero (model + manufacturer/SoC/Android tile row)
- *   2. LiveStatsStrip (4 animated metric tiles)
- *   3. ScreenSectionTitle "Sections"
- *   4. one MarrowCapabilityCard per section (full width, vertically stacked)
- *   5. ScreenSectionTitle "Quick actions"
- *   6. FilledTonalButton row (Copy / Share / Refresh)
- *   7. Footer
+ * Layout:
+ *   - A [CollapsibleTopBar] overlay at TopStart of a root [Box]. It starts
+ *     expanded (188 dp), collapses to (56 dp + statusBarHeight) as the user
+ *     scrolls down, and spring-snaps to either extreme on fling.
+ *   - A [LazyColumn] behind the bar. ALL horizontal inset comes from
+ *     [contentPadding] — no per-item `Modifier.padding(horizontal = …)`.
+ *     The top contentPadding tracks the bar height so content is never
+ *     hidden under the bar.
  */
 @Composable
 fun DeviceTab(
@@ -80,78 +78,98 @@ fun DeviceTab(
         Build.MANUFACTURER?.replaceFirstChar { it.titlecase() } ?: "—"
     }
     val soc = remember {
-        (Build.SOC_MODEL?.takeIf { it.isNotBlank() && it != "unknown" } ?: Build.HARDWARE)?.takeIf { it.isNotBlank() } ?: "—"
+        (Build.SOC_MODEL?.takeIf { it.isNotBlank() && it != "unknown" } ?: Build.HARDWARE)
+            ?.takeIf { it.isNotBlank() } ?: "—"
     }
     val androidVer = remember { "Android ${Build.VERSION.RELEASE ?: "?"}" }
     val sdkVer = remember { "API ${Build.VERSION.SDK_INT}" }
 
     val sections = snapshot?.sections.orEmpty()
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item("hero") {
-            MarrowHero(
-                title = title,
-                manufacturer = manufacturer,
-                soc = soc,
-                android = androidVer,
-                sdk = sdkVer,
-            )
-        }
-        item("stats") {
-            LiveStatsStrip(
-                battery = battery,
-                memory = memory,
-                cpuAvgMhz = cpuAvg,
-                storageUsedFraction = storageFrac,
-                onChipClick = onSection,
-            )
-        }
-        item("section-title") {
-            ScreenSectionTitle(
-                title = "Sections",
-                subtitle = "Tap any section for the full read",
-                modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp),
-            )
-        }
+    // Collapsible top bar state — starts expanded, collapses on scroll
+    val topBarState = rememberCollapsibleTopBarState()
+    val topPaddingDp = with(LocalDensity.current) { topBarState.heightPx.value.toDp() }
 
-        if (sections.isEmpty()) {
-            item("collecting") {
-                Text(
-                    text = "Collecting device info…",
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(topBarState.nestedScrollConnection),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = topPaddingDp + 8.dp,
+                bottom = 24.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item("hero") {
+                MarrowHero(
+                    title = title,
+                    manufacturer = manufacturer,
+                    soc = soc,
+                    android = androidVer,
+                    sdk = sdkVer,
+                )
+            }
+            item("stats") {
+                LiveStatsStrip(
+                    battery = battery,
+                    memory = memory,
+                    cpuAvgMhz = cpuAvg,
+                    storageUsedFraction = storageFrac,
+                    onChipClick = onSection,
+                )
+            }
+            item("section-title") {
+                ScreenSectionTitle(
+                    title = "Sections",
+                    subtitle = "Tap any section for the full read",
                     modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        } else {
-            items(sections, key = { it.id }) { section ->
-                SectionListCard(
-                    section = section,
-                    livePreview = livePreviewFor(section, battery, memory, cpuAvg, volumes),
-                    onClick = { onSection(section.id) },
+
+            if (sections.isEmpty()) {
+                item("collecting") {
+                    Text(
+                        text = "Collecting device info…",
+                        modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                items(sections, key = { it.id }) { section ->
+                    SectionListCard(
+                        section = section,
+                        livePreview = livePreviewFor(section, battery, memory, cpuAvg, volumes),
+                        onClick = { onSection(section.id) },
+                    )
+                }
+            }
+
+            item("actions-title") {
+                ScreenSectionTitle(
+                    title = "Quick actions",
+                    modifier = Modifier.padding(top = 12.dp, start = 4.dp, end = 4.dp),
                 )
+            }
+            item("actions") {
+                QuickActions(snapshot = snapshot, onRefresh = vm::refreshPhone)
+            }
+
+            item("footer") {
+                Footer()
             }
         }
 
-        item("actions-title") {
-            ScreenSectionTitle(
-                title = "Quick actions",
-                modifier = Modifier.padding(top = 12.dp, start = 4.dp, end = 4.dp),
-            )
-        }
-        item("actions") {
-            QuickActions(snapshot = snapshot, onRefresh = vm::refreshPhone)
-        }
-
-        item("footer") {
-            Footer()
-        }
+        // Collapsible bar sits on top of the list, aligned to TopStart
+        CollapsibleTopBar(
+            state = topBarState,
+            title = title,
+            subtitle = "$androidVer · $soc",
+            modifier = Modifier.align(Alignment.TopStart),
+        )
     }
 }
 
