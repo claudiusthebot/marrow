@@ -149,6 +149,11 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                 } else {
                     BigStat("Status", section.rows.firstOrNull { it.label == "Status" }?.value ?: "—")
                 }
+                val curMa = battery?.currentMa ?: Int.MIN_VALUE
+                if (!isWatch && curMa != Int.MIN_VALUE) {
+                    Spacer(Modifier.height(8.dp))
+                    BigStat("Current", "$curMa mA")
+                }
             }
         }
     }
@@ -207,7 +212,7 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
             if (!isWatch && cores.isNotEmpty()) {
                 cores.forEach { core -> CoreBar(core = core) }
             } else {
-                // Watch — pull from rows
+                // Watch -- pull from rows
                 section.rows.filter { it.label.startsWith("CPU ") }.take(coreCount).forEachIndexed { idx, row ->
                     val cur = row.value.substringAfter("now ", "0").substringBefore(" MHz").toLongOrNull() ?: 0L
                     val maxStr = row.value.substringAfter("-").substringBefore(" MHz").trim()
@@ -323,7 +328,7 @@ fun MemoryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                 }
             }
             Spacer(Modifier.height(20.dp))
-            // Big segmented bar — used (gradient) | free
+            // Big segmented bar -- used (gradient) | free
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
