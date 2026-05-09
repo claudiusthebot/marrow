@@ -252,7 +252,25 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
             Spacer(Modifier.height(20.dp))
             // Per-core bars (live values when on phone, static values when on watch)
             if (!isWatch && cores.isNotEmpty()) {
-                cores.forEach { core -> CoreBar(core = core) }
+                // Group cores by maxMhz to surface big.LITTLE / cluster topology.
+                // Falls back to a flat list when all cores share the same ceiling
+                // (e.g. emulators, or when cpufreq reads return 0).
+                val clusters = cores.groupBy { it.maxMhz }.entries.sortedBy { it.key }
+                if (clusters.size > 1) {
+                    val names = when (clusters.size) {
+                        2 -> listOf("Efficiency", "Performance")
+                        3 -> listOf("Efficiency", "Mid", "Performance")
+                        4 -> listOf("Efficiency", "Core", "Performance", "Prime")
+                        else -> clusters.indices.map { "Cluster ${it + 1}" }
+                    }
+                    clusters.forEachIndexed { idx, (maxMhz, clusterCores) ->
+                        val ghz = if (maxMhz > 0) "≤ %.1f GHz".format(maxMhz / 1000f) else "unknown"
+                        ClusterDivider("${names[idx]} · ×${clusterCores.size} · $ghz")
+                        clusterCores.forEach { core -> CoreBar(core = core) }
+                    }
+                } else {
+                    cores.forEach { core -> CoreBar(core = core) }
+                }
             } else {
                 // Watch -- pull from rows
                 section.rows.filter { it.label.startsWith("CPU ") }.take(coreCount).forEachIndexed { idx, row ->
@@ -339,6 +357,36 @@ private fun CoreBarStatic(label: String, current: Long, max: Long) {
         Spacer(Modifier.width(8.dp))
         Text("$current", style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(64.dp))
     }
+}
+
+/** Horizontal rule with a centred label used to separate CPU cluster groups. */
+@Composable
+private fun ClusterDivider(label: String) {
+    Spacer(Modifier.height(6.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant),
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant),
+        )
+    }
+    Spacer(Modifier.height(2.dp))
 }
 
 // -- Memory ------------------------------------------------------------------
