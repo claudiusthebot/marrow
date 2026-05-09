@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import rocks.talon.marrow.phone.MarrowViewModel
@@ -166,6 +167,7 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val cores by vm.cpuCores.collectAsState()
     val cpuTempC by vm.cpuTempC.collectAsState()
     val cpuUsage by vm.cpuUsagePercent.collectAsState()
+    val thermalZones by vm.thermalZones.collectAsState()
     val coreCount = section.rows.firstOrNull { it.label == "Cores" }?.value?.toIntOrNull() ?: cores.size
     val abis = section.rows.firstOrNull { it.label == "ABIs" }?.value
         ?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
@@ -280,6 +282,14 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                     CoreBarStatic(label = "Core $idx", current = cur, max = max)
                 }
             }
+            // Thermal zones overview — phone only, when we have readable zones
+            if (!isWatch && thermalZones.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                ClusterDivider("Thermal")
+                thermalZones.forEach { zone ->
+                    ThermalZoneRow(zone)
+                }
+            }
             if (abis.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
                 FlowRow(
@@ -356,6 +366,58 @@ private fun CoreBarStatic(label: String, current: Long, max: Long) {
         }
         Spacer(Modifier.width(8.dp))
         Text("$current", style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(64.dp))
+    }
+}
+
+/** One thermal zone row: name label + temperature bar + °C value. */
+@Composable
+private fun ThermalZoneRow(zone: LiveStats.ThermalZone) {
+    val color = when {
+        zone.tempC >= 60f -> Color(0xFFE53935)   // red  — hot
+        zone.tempC >= 40f -> Color(0xFFFFA726)   // orange — warm
+        else              -> Color(0xFF66BB6A)   // green — cool
+    }
+    // Bar scaled to 100 °C ceiling — most SoC zones throttle before 100 °C
+    val frac = (zone.tempC / 100f).coerceIn(0f, 1f)
+    val animated by animateFloatAsState(
+        targetValue = frac,
+        animationSpec = tween(450),
+        label = "tz-${zone.name}",
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            zone.name,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(100.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .height(8.dp)
+                .weight(1f)
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(animated)
+                    .height(8.dp)
+                    .background(color),
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "%.0f°".format(zone.tempC),
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = color,
+            modifier = Modifier.width(30.dp),
+        )
     }
 }
 

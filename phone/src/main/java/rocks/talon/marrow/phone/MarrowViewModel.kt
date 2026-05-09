@@ -93,6 +93,11 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     val cpuUsagePercent: StateFlow<Float> = _cpuUsagePercent.asStateFlow()
     private var prevCpuStat: LiveStats.CpuStatSnapshot? = null
 
+    /** All readable thermal zones ≥ 25 °C, sorted hottest-first.
+     *  Empty until the first live-loop tick, or on emulators / restricted SELinux. */
+    private val _thermalZones = MutableStateFlow<List<LiveStats.ThermalZone>>(emptyList())
+    val thermalZones: StateFlow<List<LiveStats.ThermalZone>> = _thermalZones.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -177,6 +182,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                     _cpuUsagePercent.value = LiveStats.cpuUsagePercent(prevCpu, cpuStat)
                 }
                 prevCpuStat = cpuStat
+                // Thermal zones — all accessible zones ≥ 25 °C, sorted hottest-first
+                _thermalZones.value = LiveStats.thermalZones()
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }
