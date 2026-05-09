@@ -165,6 +165,7 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
 fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val cores by vm.cpuCores.collectAsState()
     val cpuTempC by vm.cpuTempC.collectAsState()
+    val cpuUsage by vm.cpuUsagePercent.collectAsState()
     val coreCount = section.rows.firstOrNull { it.label == "Cores" }?.value?.toIntOrNull() ?: cores.size
     val abis = section.rows.firstOrNull { it.label == "ABIs" }?.value
         ?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
@@ -205,6 +206,47 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                             color = tempColor,
                         )
                     }
+                }
+            }
+            // Live CPU utilisation bar — phone only, shown after second tick
+            if (!isWatch && cpuUsage >= 0f) {
+                Spacer(Modifier.height(12.dp))
+                val usageFrac = (cpuUsage / 100f).coerceIn(0f, 1f)
+                val animatedUsage by animateFloatAsState(
+                    targetValue = usageFrac,
+                    animationSpec = tween(450),
+                    label = "cpu-usage",
+                )
+                val usageColor = when {
+                    cpuUsage >= 90f -> Color(0xFFE53935)   // red — very high
+                    cpuUsage >= 70f -> Color(0xFFFFA726)   // orange — elevated
+                    else -> MaterialTheme.colorScheme.primary
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .height(10.dp)
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(animatedUsage)
+                                .height(10.dp)
+                                .background(usageColor),
+                        )
+                    }
+                    Text(
+                        "${cpuUsage.toInt()}%",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = usageColor,
+                        modifier = Modifier.width(36.dp),
+                    )
                 }
             }
             Spacer(Modifier.height(20.dp))

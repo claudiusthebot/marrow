@@ -86,6 +86,13 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _systemUptimeSeconds = MutableStateFlow(0L)
     val systemUptimeSeconds: StateFlow<Long> = _systemUptimeSeconds.asStateFlow()
 
+    /** Total CPU utilisation as a percentage (0–100f).
+     *  -1f until the second live-loop tick provides a /proc/stat delta.
+     *  Returns -1f on emulators or devices with restricted SELinux policy. */
+    private val _cpuUsagePercent = MutableStateFlow(-1f)
+    val cpuUsagePercent: StateFlow<Float> = _cpuUsagePercent.asStateFlow()
+    private var prevCpuStat: LiveStats.CpuStatSnapshot? = null
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -163,6 +170,13 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 if (diskSnap != null) prevDiskSnapshot = diskSnap
                 // System uptime — cheap file read, no permissions needed
                 _systemUptimeSeconds.value = LiveStats.systemUptimeSeconds()
+                // CPU utilisation — two-snapshot /proc/stat delta (same pattern as disk/network)
+                val cpuStat = LiveStats.cpuStatSnapshot()
+                val prevCpu = prevCpuStat
+                if (cpuStat != null && prevCpu != null) {
+                    _cpuUsagePercent.value = LiveStats.cpuUsagePercent(prevCpu, cpuStat)
+                }
+                prevCpuStat = cpuStat
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }
