@@ -177,6 +177,70 @@ object LiveStats {
         return temps.max() / 1000f
     }
 
+    // -- Thermal zones -----------------------------------------------------------
+
+    /** One readable thermal zone: human-readable name + current temperature. */
+    data class ThermalZone(
+        val name: String,   // normalised zone type (e.g. "CPU Therm", "Battery", "GPU")
+        val tempC: Float,   // temperature in °C
+    )
+
+    /**
+     * Reads all accessible thermal zones from `/sys/class/thermal/thermal_zone*`
+     * and returns those reporting a temperature ≥ [minTempC], sorted hottest-first,
+     * capped at [limit] entries.
+     *
+     * Zone type strings vary wildly across SoC vendors (Qualcomm tsens_tz_sensor*,
+     * MediaTek thermal_zone*, Samsung exynos*, etc.). Names are normalised:
+     * underscores/dashes → spaces, common abbreviations expanded, title-cased.
+     *
+     * Returns an empty list when sysfs is inaccessible (emulator, SELinux restriction).
+     */
+    fun thermalZones(minTempC: Float = 25f, limit: Int = 12): List<ThermalZone> {
+        val thermalRoot = File("/sys/class/thermal")
+        if (!thermalRoot.exists()) return emptyList()
+        return thermalRoot.listFiles { f ->
+            f.isDirectory && f.name.startsWith("thermal_zone")
+        }?.mapNotNull { zone ->
+            val rawType = readString("${zone.path}/type") ?: return@mapNotNull null
+            val tempMillis = readLong("${zone.path}/temp").takeIf { it > 0L } ?: return@mapNotNull null
+            val tempC = tempMillis / 1000f
+            if (tempC < minTempC) return@mapNotNull null
+            ThermalZone(normalizeThermalName(rawType), tempC)
+        }
+            ?.sortedByDescending { it.tempC }
+            ?.take(limit)
+            .orEmpty()
+    }
+
+    private fun normalizeThermalName(raw: String): String {
+        // Replace separators with spaces, split into tokens, map well-known abbreviations
+        val tokens = raw.replace(Regex("[_\\-]"), " ").trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+        val mapped = tokens.joinToString(" ") { word ->
+            when (word.lowercase()) {
+                "cpu"                    -> "CPU"
+                "gpu"                    -> "GPU"
+                "soc"                    -> "SoC"
+                "pmic"                   -> "PMIC"
+                "batt", "battery"        -> "Battery"
+                "therm", "thermal"       -> "Therm"
+                "temp"                   -> "Temp"
+                "tz", "tsens"            -> "Sensor"
+                "npu"                    -> "NPU"
+                "wifi", "wlan"           -> "WiFi"
+                "modem", "mdm"           -> "Modem"
+                "cam", "camera"          -> "Camera"
+                "usb"                    -> "USB"
+                "ddr", "mem", "memory"   -> "Memory"
+                "bcl"                    -> "BCL"
+                "pa"                     -> "PA"
+                else                     -> word.replaceFirstChar { it.uppercaseChar() }
+            }
+        }
+        // Cap display length
+        return if (mapped.length > 22) mapped.take(21).trimEnd() + "…" else mapped
+    }
+
     // -- Storage -----------------------------------------------------------------
 
     data class Volume(
