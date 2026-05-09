@@ -25,7 +25,7 @@ import rocks.talon.marrow.shared.LiveStats
  * App-wide state holder.
  *
  * - **Snapshot** for the phone (full collector dump) and watch (cached/live).
- * - **Live stats** (battery / memory / cpu / storage / cpu-temp / network / disk I/O)
+ * - **Live stats** (battery / memory / cpu / storage / cpu-temp / network / disk I/O / uptime)
  *   polled every refresh interval — used by the Device tab's hero/strip and per-section heroes.
  * - **Settings** stream from DataStore so the theme/interval react to changes.
  */
@@ -80,6 +80,11 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _diskRate = MutableStateFlow(0L to 0L)
     val diskRate: StateFlow<Pair<Long, Long>> = _diskRate.asStateFlow()
     private var prevDiskSnapshot: LiveStats.DiskSnapshot? = null
+
+    /** System uptime in seconds since last boot (from /proc/uptime).
+     *  0L until the first live-loop tick. */
+    private val _systemUptimeSeconds = MutableStateFlow(0L)
+    val systemUptimeSeconds: StateFlow<Long> = _systemUptimeSeconds.asStateFlow()
 
     // -- Settings ----------------------------------------------------------------
 
@@ -156,6 +161,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                     _diskRate.value = LiveStats.diskRate(prevSnap, diskSnap)
                 }
                 if (diskSnap != null) prevDiskSnapshot = diskSnap
+                // System uptime — cheap file read, no permissions needed
+                _systemUptimeSeconds.value = LiveStats.systemUptimeSeconds()
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }

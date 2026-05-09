@@ -289,6 +289,46 @@ object LiveStats {
         else -> "$bytesPerSec B/s"
     }
 
+    // -- System uptime -----------------------------------------------------------
+
+    /**
+     * System uptime in seconds since the last boot.
+     *
+     * Reads the first floating-point field from `/proc/uptime` (total elapsed
+     * seconds since boot, including sleep time). No permissions required — the
+     * file is world-readable on standard Android. Returns 0L when inaccessible
+     * (sandboxed test environment, unusual SELinux policy).
+     */
+    fun systemUptimeSeconds(): Long =
+        runCatching {
+            File("/proc/uptime").readText().trim()
+                .split(Regex("\\s+")).firstOrNull()
+                ?.toDoubleOrNull()?.toLong() ?: 0L
+        }.getOrDefault(0L)
+
+    /**
+     * Formats an uptime in seconds as a concise human-readable string.
+     *
+     * Examples:
+     * - 47 minutes → "47m"
+     * - 2 hours 34 minutes → "2h 34m"
+     * - 5 days 3 hours → "5d 3h"
+     * - 0 / unavailable → "—"
+     */
+    fun formatUptime(seconds: Long): String {
+        if (seconds <= 0L) return "—"
+        val days = seconds / 86_400L
+        val hours = (seconds % 86_400L) / 3_600L
+        val mins = (seconds % 3_600L) / 60L
+        return when {
+            days > 0 && hours > 0 -> "${days}d ${hours}h"
+            days > 0              -> "${days}d"
+            hours > 0 && mins > 0 -> "${hours}h ${mins}m"
+            hours > 0             -> "${hours}h"
+            else                  -> "${mins}m"
+        }
+    }
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =

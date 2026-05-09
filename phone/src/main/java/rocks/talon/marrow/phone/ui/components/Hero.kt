@@ -47,6 +47,7 @@ import rocks.talon.marrow.phone.ui.icons.MarrowIcons
  * @param soc           SoC string — `Build.SOC_MODEL` or hardware fallback
  * @param android       e.g. "Android 17"
  * @param sdk           e.g. "API 35"
+ * @param uptime        formatted uptime string, e.g. "2h 34m", "5d 3h"; empty → tile hidden
  * @param icon          section/device glyph drawn into the StatusIcon
  */
 @Composable
@@ -56,6 +57,7 @@ fun MarrowHero(
     soc: String,
     android: String,
     sdk: String,
+    uptime: String = "",
     modifier: Modifier = Modifier,
     icon: ImageVector = MarrowIcons.Device,
 ) {
@@ -102,27 +104,38 @@ fun MarrowHero(
                 modifier = Modifier.height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                val tileColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f)
+                val tileContent = MaterialTheme.colorScheme.onPrimaryContainer
                 HeroMetricTile(
                     label = "Make",
                     value = manufacturer,
                     modifier = Modifier.weight(1f),
-                    container = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f),
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    container = tileColor,
+                    contentColor = tileContent,
                 )
                 HeroMetricTile(
                     label = "SoC",
                     value = soc,
                     modifier = Modifier.weight(1f),
-                    container = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f),
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    container = tileColor,
+                    contentColor = tileContent,
                 )
                 HeroMetricTile(
                     label = sdk,
                     value = android,
                     modifier = Modifier.weight(1f),
-                    container = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f),
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    container = tileColor,
+                    contentColor = tileContent,
                 )
+                if (uptime.isNotBlank()) {
+                    HeroMetricTile(
+                        label = "Uptime",
+                        value = uptime,
+                        modifier = Modifier.weight(1f),
+                        container = tileColor,
+                        contentColor = tileContent,
+                    )
+                }
             }
         }
     }
