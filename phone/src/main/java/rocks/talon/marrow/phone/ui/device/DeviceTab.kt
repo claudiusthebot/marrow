@@ -69,9 +69,11 @@ fun DeviceTab(
     val memory by vm.memory.collectAsState()
     val cpuCores by vm.cpuCores.collectAsState()
     val volumes by vm.volumes.collectAsState()
+    val uptimeSeconds by vm.systemUptimeSeconds.collectAsState()
 
     val cpuAvg = remember(cpuCores) { LiveStats.avgCurMhz(cpuCores) }
     val storageFrac = remember(volumes) { LiveStats.storageUsedFraction(volumes) }
+    val uptimeFormatted = remember(uptimeSeconds) { LiveStats.formatUptime(uptimeSeconds) }
 
     val title = remember { Build.MODEL ?: "Android device" }
     val manufacturer = remember {
@@ -110,6 +112,7 @@ fun DeviceTab(
                     soc = soc,
                     android = androidVer,
                     sdk = sdkVer,
+                    uptime = uptimeFormatted,
                 )
             }
             item("stats") {
@@ -243,7 +246,7 @@ private fun Footer() {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "Marrow v0.3.0",
+            text = "Marrow v0.6.0",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
