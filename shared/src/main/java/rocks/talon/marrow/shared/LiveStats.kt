@@ -112,6 +112,48 @@ object LiveStats {
         return active.sumOf { it.curMhz } / active.size
     }
 
+    /**
+     * Snapshot of cumulative CPU time jiffies from `/proc/stat` (first "cpu" line).
+     *
+     * Fields: user nice system idle iowait irq softirq steal [guest guestNice]
+     * [total] = sum of all fields.  [idle] = idle + iowait.
+     *
+     * Returns null when the file is unreadable (emulator / SELinux restriction).
+     */
+    data class CpuStatSnapshot(
+        val total: Long,
+        val idle: Long,
+        val timestampMs: Long,
+    )
+
+    /** Read a single [CpuStatSnapshot]. Returns null on any failure. */
+    fun cpuStatSnapshot(): CpuStatSnapshot? = runCatching {
+        val line = File("/proc/stat").useLines { it.firstOrNull() } ?: return@runCatching null
+        // format: "cpu  user nice system idle iowait irq softirq steal guest guestNice"
+        val parts = line.trim().split(Regex("\\s+")).drop(1) // drop "cpu" label
+        val longs = parts.mapNotNull { it.toLongOrNull() }
+        if (longs.size < 5) return@runCatching null
+        val idle = longs[3] + longs.getOrElse(4) { 0L }   // idle + iowait
+        CpuStatSnapshot(
+            total = longs.sum(),
+            idle = idle,
+            timestampMs = System.currentTimeMillis(),
+        )
+    }.getOrNull()
+
+    /**
+     * Total CPU utilisation (0–100f) derived from two consecutive snapshots.
+     *
+     * Returns 0f when the elapsed jiffy delta is zero or negative (clock skew,
+     * first-tick edge case).
+     */
+    fun cpuUsagePercent(prev: CpuStatSnapshot, curr: CpuStatSnapshot): Float {
+        val dTotal = curr.total - prev.total
+        if (dTotal <= 0L) return 0f
+        val dIdle = curr.idle - prev.idle
+        return ((dTotal - dIdle).toFloat() / dTotal.toFloat()).coerceIn(0f, 1f) * 100f
+    }
+
     /** Reads the highest CPU / SoC thermal zone temperature in °C.
      *
      *  Scans `/sys/class/thermal/thermal_zone*` and filters zones whose `type`
