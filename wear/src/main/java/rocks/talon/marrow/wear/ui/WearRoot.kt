@@ -357,10 +357,11 @@ private fun SectionDetailScreen(vm: WearViewModel, index: Int) {
     val refreshing by vm.refreshing.collectAsState()
     val section = remember(snapshot, index) { snapshot?.sections?.getOrNull(index) }
 
-    // Live 10s polling for Battery, Memory, and CPU while on their detail screens.
+    // Live 10s polling for Battery, Memory, CPU, and GPU while on their detail screens.
     val needsLive = section?.id == Sections.BATTERY ||
         section?.id == Sections.MEMORY ||
-        section?.id == Sections.CPU
+        section?.id == Sections.CPU ||
+        section?.id == Sections.GPU
     DisposableEffect(needsLive) {
         if (needsLive) vm.startLive()
         onDispose { if (needsLive) vm.stopLive() }
@@ -369,6 +370,7 @@ private fun SectionDetailScreen(vm: WearViewModel, index: Int) {
     val battery by vm.battery.collectAsState()
     val memory by vm.memory.collectAsState()
     val cpuCores by vm.cpuCores.collectAsState()
+    val gpu by vm.gpu.collectAsState()
 
     val listState = rememberTransformingLazyColumnState()
     val transformSpec = rememberTransformationSpec()
@@ -444,6 +446,21 @@ private fun SectionDetailScreen(vm: WearViewModel, index: Int) {
                 item {
                     CpuFreqCard(
                         cores = cpuCores,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .transformedHeight(this, transformSpec),
+                        transformation = SurfaceTransformation(transformSpec),
+                    )
+                }
+            }
+
+            // Frequency bar for GPU — shows current / max MHz live, plus utilisation
+            // when the driver exposes it (kgsl `gpu_busy_percentage` or devfreq `load`).
+            // Only renders when the live loop has produced an `available` snapshot.
+            if (section?.id == Sections.GPU && gpu?.available == true) {
+                item {
+                    GpuFreqCard(
+                        gpu = gpu!!,
                         modifier = Modifier
                             .fillMaxWidth()
                             .transformedHeight(this, transformSpec),
@@ -697,6 +714,90 @@ private fun CpuFreqCard(
             }
             Text(
                 text = "${activeCores.size}/${cores.size} cores active · max $maxMhz MHz",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Frequency bar for the GPU detail screen.
+ *
+ * Mirrors `CpuFreqCard` but draws GPU `curMhz` over `maxMhz`. When the driver
+ * exposes utilisation (`usagePercent >= 0`) the card prefers it as the
+ * coloured fill — utilisation is the more useful at-a-glance signal. When
+ * utilisation is unavailable (most generic devfreq drivers) the fill falls
+ * back to the frequency fraction.
+ *
+ * Live-updates every 10s while the GPU detail screen is composed (driven by
+ * `WearViewModel.startLive` / `stopLive` via DisposableEffect, same as the
+ * Battery / Memory / CPU cards).
+ *
+ * Colour coding matches the existing Marrow palette:
+ *   primary   — light load (<40%)
+ *   tertiary  — moderate load (40–70%)
+ *   error     — heavy load (>70%)
+ */
+@Composable
+private fun GpuFreqCard(
+    gpu: LiveStats.Gpu,
+    modifier: Modifier,
+    transformation: SurfaceTransformation,
+) {
+    val curMhz = gpu.curMhz
+    val maxMhz = gpu.maxMhz
+    val freqFraction = gpu.freqFraction
+    val usagePct = gpu.usagePercent
+    val hasUsage = usagePct in 0..100
+    // Prefer utilisation as the coloured fill when the driver provides it.
+    val fillFraction = if (hasUsage) (usagePct / 100f).coerceIn(0f, 1f) else freqFraction
+    val barColor = when {
+        fillFraction > 0.70f -> MaterialTheme.colorScheme.error
+        fillFraction > 0.40f -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+    Card(
+        onClick = {},
+        modifier = modifier,
+        transformation = transformation,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = when {
+                    hasUsage && curMhz > 0 -> "$curMhz MHz · $usagePct%"
+                    curMhz > 0 -> "$curMhz MHz"
+                    else -> "Reading…"
+                },
+                style = MaterialTheme.typography.labelLarge,
+                color = barColor,
+            )
+            // Fill bar: utilisation (if available) else frequency fraction
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)),
+            ) {
+                if (fillFraction > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(fillFraction)
+                            .background(barColor),
+                    )
+                }
+            }
+            Text(
+                text = buildString {
+                    append("max $maxMhz MHz")
+                    gpu.governor?.let { append(" · ").append(it) }
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -89,6 +89,16 @@ object WearIcons {
             .s("M9 4 V7").s("M12 4 V7").s("M15 4 V7")
             .s("M9 17 V20").s("M12 17 V20").s("M15 17 V20")
     }
+    val Gpu = marrow("Gpu") {
+        // GPU die: rectangular body with three pads top + bottom and a 3×2 inner grid
+        // suggesting shader clusters. Same family as the phone MarrowIcons.Gpu glyph,
+        // simplified for the smaller watch viewport.
+        s("M5 7 H19 V17 H5 Z")
+            .s("M8 7 V4").s("M12 7 V4").s("M16 7 V4")
+            .s("M8 17 V20").s("M12 17 V20").s("M16 17 V20")
+            .s("M8 10 H16").s("M8 14 H16")
+            .s("M11 10 V14").s("M14 10 V14")
+    }
     val Memory = marrow("Memory") {
         s("M3.5 7.5 H20.5 V11 H3.5 Z")
             .s("M3.5 13 H20.5 V16.5 H3.5 Z")
@@ -148,6 +158,7 @@ object WearIcons {
         Sections.CAMERAS -> Cameras
         Sections.BUILD_FLAGS -> BuildFlags
         Sections.SOFTWARE -> Software
+        Sections.GPU -> Gpu
         else -> Device
     }
 }

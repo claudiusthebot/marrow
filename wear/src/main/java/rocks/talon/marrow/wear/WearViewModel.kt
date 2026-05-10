@@ -52,6 +52,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val _cpuCores = MutableStateFlow<List<LiveStats.CpuCore>>(emptyList())
     val cpuCores: StateFlow<List<LiveStats.CpuCore>> = _cpuCores.asStateFlow()
 
+    /** Live GPU snapshot. null until the live loop has ticked at least once.
+     *  On watches without an exposed GPU sysfs path the snapshot will report
+     *  `available = false` and the GPU detail card falls back to its raw rows. */
+    private val _gpu = MutableStateFlow<LiveStats.Gpu?>(null)
+    val gpu: StateFlow<LiveStats.Gpu?> = _gpu.asStateFlow()
+
     private var liveJob: Job? = null
 
     init {
@@ -83,6 +89,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 _battery.value = LiveStats.battery(getApplication())
                 _memory.value = LiveStats.memory(getApplication())
                 _cpuCores.value = LiveStats.cpuCores()
+                _gpu.value = LiveStats.gpu()
                 delay(10_000L)
             }
         }
