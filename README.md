@@ -16,51 +16,56 @@ one auto-installs the other through Play. The two halves talk over the Wear
 OS Data Layer: the phone's *Watch* tab asks the watch for its info and
 renders the response with the same UI it uses for itself.
 
-## What's new in v0.2.0
+## Current versions
 
-The phone module is now a showcase-grade Material 3 Expressive app:
+- **Phone** — `v1.3.0` (versionCode 16)
+- **Wear** — `v0.7.0` (versionCode 9)
 
-- **Hero header** — large display-typography device name, manufacturer · SoC ·
-  Android version subtitle, gradient surface, hand-drawn bone glyph mascot.
-- **Live stats strip** — animated chips for Battery %, RAM used %, CPU avg
-  MHz, Storage used %. Tap a chip to jump to the corresponding section.
-- **12 section cards** — Battery, CPU, Memory, Storage, Display, Network,
-  Sensors, Cameras, Build flags, System, Device, Software. Each card shows
-  a custom-drawn glyph (no Material Icons defaults), live preview value,
-  and animates on press with a haptic kick.
-- **Bespoke per-section heroes** on every detail screen:
-  - **Battery**: animated circular gauge tinted by level (red → amber →
-    green), `charging` state, voltage / temp / plug type strip.
-  - **CPU**: live per-core frequency bars, governor chip, ABI chip row.
-  - **Memory**: segmented gradient bar with used/free legend.
-  - **Storage**: per-volume progress bar list.
-  - **Display**: phone-shape preview rectangle, HDR badge, density.
-  - **Network**: transport headline + carrier/SSID + RSSI chip.
-  - **Sensors**: live readings (accel XYZ bars, light lux, proximity,
-    pressure, ambient temperature) — listeners registered only while
-    composed via `DisposableEffect`, no background drain.
-  - **Cameras / Build / Device / System / Software**: contextual headlines.
-- **Section detail screens** with `LargeTopAppBar` collapsing scroll,
-  pull-to-refresh, tap-to-copy on every row, share action.
-- **Quick actions** — Copy report (Markdown), Share, Refresh.
-- **Settings** — theme picker (Dynamic / Brand / System), refresh-interval
-  slider (1–30 s), persisted via DataStore.
-- **Adaptive layout** — single column < 600dp, 2 cols at 600dp, 3 cols at
-  840dp+ (foldables / large screens).
-- **Edge-to-edge** with `enableEdgeToEdge()` + `WindowCompat`, status &
-  navigation bar insets handled via `windowInsetsPadding`.
-- **Material 3 Expressive motion scheme** wired through the theme.
+## What's new since v0.2.0
 
-The watch module gets matching polish:
+The phone module gained an entire live-telemetry layer on top of the
+showcase Material 3 Expressive shell. Headline additions:
 
-- **Custom-drawn section icons** in a Wear-tuned weight (2 dp stroke,
-  18 dp viewport in cards), same family as the phone.
-- **Live battery/memory** on the Battery and Memory detail screens — 10 s
-  polling registered via `DisposableEffect`, unregistered on swipe-back.
-- **Contextual EdgeButton** — `Refresh` when phone unreachable, `Ping
-  phone` when connected. Detail screens always show `Refresh`.
-- **Disconnected state** — list shows `Phone disconnected · Showing cached
-  data` instead of failing silently.
+- **GPU section** (v1.1.0 → v1.3.0) — `LiveStats.Gpu` sysfs snapshot
+  (vendor / renderer / frequency / utilisation) with a `GpuHero`
+  composable matching the rest of the section heroes. GPU also shows up
+  as the fourth tile in the home `LiveStatsStrip`.
+- **CPU section depth** — live utilisation bar in `CpuHero` (v0.7.0), bars
+  grouped by cluster topology (v0.8.0), thermal-zone overview pulled from
+  `/sys/class/thermal` (v0.9.0).
+- **Live current draw** in `BatteryHero` (v0.5.2) from
+  `BatteryManager.BATTERY_PROPERTY_CURRENT_NOW`, sign-aware (charge vs
+  discharge), animated.
+- **Memory pressure level + zRAM bar** in `MemoryHero` (v1.0.0).
+- **Live storage I/O read/write rates** in `StorageHero` (v0.5.3) sampled
+  from `/proc/diskstats`.
+- **Live network throughput** in the Network detail hero (v0.4.0) — RX/TX
+  bytes/s with a rolling sparkline, sampled from `TrafficStats`.
+- **System uptime** in the hero strip (v0.6.0).
+- **Collapsible `LargeTopAppBar`** wired through detail screens (v0.3.0
+  scroll UX), squircle shapes throughout (v0.3.0 design polish).
+
+The watch module went from "data dump" to "at-a-glance":
+
+- **v0.4.0** — visual gauges + home stats row matching the phone's
+  LiveStatsStrip vocabulary.
+- **v0.5.0** — live CPU frequency bar in the CPU detail screen, per-cluster.
+- **v0.6.0** — live GPU frequency card in a new GPU detail screen,
+  utilisation-preferred fill colour.
+- **v0.7.0** — **Stats Tile** for the watch face: a 2×2 coloured-pill grid
+  showing battery / memory / CPU / GPU, 30 s refresh, comfort-band tints
+  (primary < 40 %, tertiary 40–70 %, error > 70 %). Tap launches the app.
+  Non-interactive — sits on the watch face, no app-open round-trip needed.
+
+Carried over from v0.2.0 and still load-bearing:
+
+- 12 phone section cards with custom glyphs, hero header, animated
+  `LiveStatsStrip`, M3 Expressive motion scheme, adaptive layout (1 / 2 /
+  3 cols), edge-to-edge insets, tap-to-copy rows, theme picker,
+  refresh-interval slider.
+- Wear: custom-drawn Wear-tuned glyphs, `DisposableEffect`-gated polling
+  on detail screens, contextual EdgeButton (`Ping phone` ↔ `Refresh`),
+  disconnected-state messaging.
 
 ## Features (data points)
 
@@ -72,12 +77,19 @@ The watch module gets matching polish:
   technology, capacity counter, current (now / avg), energy counter.
 - **CPU** — ABI list, core count, per-core current/min/max frequency from
   `/sys/devices/system/cpu`, scaling governor.
-- **Memory** — total, available, low-memory threshold; live used %.
-- **Storage** — internal and external partition totals; per-volume bars.
+- **Memory** — total, available, low-memory threshold; live used %; pressure
+  level and zRAM swap usage.
+- **GPU** — vendor / renderer / version strings (`GLES20.glGetString`),
+  current / min / max frequency from `/sys/class/kgsl/kgsl-3d0/devfreq/*`,
+  utilisation percent when the driver exposes it (`gpu_busy_percentage`).
+- **Storage** — internal and external partition totals; per-volume bars;
+  live read/write throughput from `/proc/diskstats`.
 - **Display** — pixel resolution, density, scaled density, refresh rate,
   available modes, HDR capability set.
 - **Network** — active transport, validated/internet capability, link speeds,
-  Wi-Fi RSSI / link speed / frequency / SSID, carrier name, MCC/MNC, IPs.
+  Wi-Fi RSSI / link speed / frequency / SSID, carrier name, MCC/MNC, IPs;
+  live RX/TX throughput via `TrafficStats`.
+- **Thermal** — `/sys/class/thermal/thermal_zone*` type and temperature.
 - **Sensors** — full SensorManager.getSensorList() dump with vendor, type,
   range, power; live readings for accel/light/proximity/pressure/temp.
 - **Cameras** — per-camera ID, facing, max JPEG resolution, sensor pixel
@@ -100,13 +112,17 @@ Grab the two debug APKs from the [latest
 release](https://github.com/claudiusthebot/marrow/releases/latest):
 
 ```
-adb install marrow-phone-v0.2.0-debug.apk         # on your phone
-adb -s <watch-serial> install marrow-wear-v0.2.0-debug.apk  # on your Wear OS device
+adb install marrow-phone-v1.3.0-debug.apk        # on your phone
+adb -s <watch-serial> install marrow-wear-v0.7.0-debug.apk  # on your Wear OS device
 ```
 
 Both modules use the same `applicationId = rocks.talon.marrow`, so once the
 Play Store auto-pair is enabled they install together. Sideloading both
 manually works too — they pair via the Data Layer regardless.
+
+After installing the watch APK, long-press the watch face → **Tiles** →
+add **Marrow** to put the live 2×2 stats grid one swipe away from the
+clock face.
 
 ## Architecture
 
@@ -114,6 +130,7 @@ manually works too — they pair via the Data Layer regardless.
 shared/   ← DeviceInfoCollector + LiveStats primitives + wire format
 phone/    ← Material 3 Expressive nav-host app, three tabs + detail/settings
 wear/     ← Wear Compose Material 3 app with edge button + rotary list
+            + StatsTileService (the 2×2 watch-face tile, v0.7.0+)
 ```
 
 `shared` is an Android library module — both apps depend on it, so the
@@ -127,8 +144,11 @@ background.
 
 The phone's per-section detail screens reach into a small set of structured
 "live primitives" (`LiveStats.Battery`, `LiveStats.Memory`, `LiveStats.CpuCore`,
-`LiveStats.Volume`) that are polled every refresh-interval seconds — that's
-where the animated battery ring and per-core CPU bars get their numbers.
+`LiveStats.Gpu`, `LiveStats.Volume`, `LiveStats.NetworkSpeed`, `LiveStats.ThermalZone`)
+that are polled every refresh-interval seconds — that's where the animated
+battery ring, per-core CPU bars, GPU utilisation strip, throughput sparkline
+and thermal zones get their numbers. The same primitives feed the Wear
+tile's 2×2 cells.
 
 ## Building from source
 
