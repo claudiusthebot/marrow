@@ -122,6 +122,7 @@ fun DeviceTab(
                     memory = memory,
                     cpuAvgMhz = cpuAvg,
                     storageUsedFraction = storageFrac,
+                    gpu = gpu,
                     onChipClick = onSection,
                 )
             }
@@ -247,7 +248,7 @@ private fun Footer() {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "Marrow v1.0.0",
+            text = "Marrow v1.3.0",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
