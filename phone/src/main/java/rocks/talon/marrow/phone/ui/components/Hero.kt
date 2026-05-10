@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 import rocks.talon.marrow.phone.ui.icons.MarrowIcons
 
 /* -------------------------------------------------------------------------- */
@@ -37,6 +36,8 @@ import rocks.talon.marrow.phone.ui.icons.MarrowIcons
 /* Shape: AbsoluteSmoothCornerShape(32.dp, 60) — slightly larger radius than  */
 /* the capability cards (28dp) to give the hero its own visual weight, same   */
 /* smoothness as the rest of the design system.                               */
+/*                                                                             */
+/* AbsoluteSmoothCornerShape is defined locally in SmoothCornerShape.kt.      */
 /* -------------------------------------------------------------------------- */
 
 /**
