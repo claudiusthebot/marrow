@@ -246,7 +246,7 @@ private fun Footer() {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "Marrow v0.6.0",
+            text = "Marrow v1.0.0",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
