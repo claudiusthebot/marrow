@@ -889,7 +889,9 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
     val carrier = section.rows.firstOrNull { it.label == "Carrier" }?.value
     val ssid = section.rows.firstOrNull { it.label == "Wi-Fi SSID" }?.value
     val rssi = section.rows.firstOrNull { it.label == "Wi-Fi RSSI" }?.value
-    val (rxBps, txBps) by vm.networkRate.collectAsState()
+    // val (a, b) by delegate is not valid Kotlin syntax — split into two lines.
+    val networkRatePair by vm.networkRate.collectAsState()
+    val (rxBps, txBps) = networkRatePair
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
