@@ -46,6 +46,7 @@ object Sections {
     const val CAMERAS = "cameras"
     const val BUILD_FLAGS = "build_flags"
     const val SOFTWARE = "software"
+    const val GPU = "gpu"
 }
 
 object MarrowPaths {

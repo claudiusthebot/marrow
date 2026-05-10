@@ -173,6 +173,7 @@ private fun SectionHero(vm: MarrowViewModel, section: Section, source: String) {
         Sections.DEVICE -> DeviceHero(section = section)
         Sections.SYSTEM -> SystemHero(section = section)
         Sections.SOFTWARE -> SoftwareHero(section = section)
+        Sections.GPU -> GpuHero(vm = vm, section = section)
         else -> GenericHero(section = section)
     }
 }
