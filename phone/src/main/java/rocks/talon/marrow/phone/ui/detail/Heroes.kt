@@ -453,6 +453,22 @@ private fun ClusterDivider(label: String) {
 
 // -- Memory ------------------------------------------------------------------
 
+/**
+ * Memory pressure level derived from used fraction and the system's lowMemory flag.
+ *
+ * Comfortable  < 60% used   — green
+ * Moderate     60–80% used  — orange
+ * Critical     > 80% OR ActivityManager.lowMemory == true — red
+ */
+private enum class MemoryPressure(
+    val label: String,
+    val color: Color,
+) {
+    COMFORTABLE("Comfortable", Color(0xFF66BB6A)),
+    MODERATE("Moderate pressure", Color(0xFFFFA726)),
+    CRITICAL("Low memory!", Color(0xFFE53935)),
+}
+
 @Composable
 fun MemoryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val mem by vm.memory.collectAsState()
@@ -461,6 +477,20 @@ fun MemoryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val usedBytes = (totalBytes - availBytes).coerceAtLeast(0L)
     val frac = if (totalBytes > 0) usedBytes.toFloat() / totalBytes.toFloat() else 0f
     val animated by animateFloatAsState(targetValue = frac, animationSpec = tween(500), label = "mem-frac")
+
+    // Swap / zRAM — phone only (watch snapshot rows don't include swap)
+    val swapTotal = if (!isWatch) mem?.swapTotalBytes ?: 0L else 0L
+    val swapUsed = if (!isWatch) mem?.swapUsedBytes ?: 0L else 0L
+    val swapFrac = if (swapTotal > 0L) (swapUsed.toFloat() / swapTotal.toFloat()).coerceIn(0f, 1f) else 0f
+    val animatedSwap by animateFloatAsState(targetValue = swapFrac, animationSpec = tween(500), label = "swap-frac")
+
+    // Memory pressure level — phone only
+    val lowMemory = !isWatch && mem?.lowMemory == true
+    val pressure = when {
+        !isWatch && (lowMemory || frac > 0.80f) -> MemoryPressure.CRITICAL
+        !isWatch && frac > 0.60f               -> MemoryPressure.MODERATE
+        else                                   -> MemoryPressure.COMFORTABLE
+    }
 
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
@@ -480,7 +510,7 @@ fun MemoryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                 }
             }
             Spacer(Modifier.height(20.dp))
-            // Big segmented bar -- used (gradient) | free
+            // RAM bar -- used (gradient) | free
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -506,6 +536,57 @@ fun MemoryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 LegendDot(color = MaterialTheme.colorScheme.primary, label = "Used ${formatGib(usedBytes)}")
                 LegendDot(color = MaterialTheme.colorScheme.surfaceVariant, label = "Free ${formatGib(availBytes)}")
+            }
+            // zRAM bar — only when swap is configured (most modern Android phones use zRAM)
+            if (swapTotal > 0L) {
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        "zRAM",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        "${formatGib(swapUsed)} / ${formatGib(swapTotal)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(animatedSwap)
+                            .height(10.dp)
+                            .background(MaterialTheme.colorScheme.secondary),
+                    )
+                }
+            }
+            // Memory pressure badge
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(pressure.color),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    pressure.label,
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = pressure.color,
+                )
             }
         }
     }

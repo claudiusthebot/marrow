@@ -75,18 +75,47 @@ object LiveStats {
         val availBytes: Long,
         val thresholdBytes: Long,
         val lowMemory: Boolean,
+        /** Swap / zRAM total in bytes. 0 when no swap is configured on this device. */
+        val swapTotalBytes: Long = 0L,
+        /** Swap / zRAM currently in use (SwapTotal − SwapFree from /proc/meminfo). */
+        val swapUsedBytes: Long = 0L,
     ) {
         val usedBytes: Long get() = (totalBytes - availBytes).coerceAtLeast(0L)
         val usedFraction: Float
             get() = if (totalBytes > 0) (usedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f) else 0f
         val usedPercent: Int get() = (usedFraction * 100f).toInt()
+        val swapUsedFraction: Float
+            get() = if (swapTotalBytes > 0) (swapUsedBytes.toFloat() / swapTotalBytes.toFloat()).coerceIn(0f, 1f) else 0f
     }
 
     fun memory(context: Context): Memory {
         val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val mi = ActivityManager.MemoryInfo()
         am.getMemoryInfo(mi)
-        return Memory(mi.totalMem, mi.availMem, mi.threshold, mi.lowMemory)
+        // Read zRAM / swap stats from /proc/meminfo (values are in kB — multiply × 1024).
+        // /proc/meminfo is world-readable on standard Android; no special permissions needed.
+        var swapTotalKb = 0L
+        var swapFreeKb = 0L
+        runCatching {
+            File("/proc/meminfo").forEachLine { line ->
+                when {
+                    line.startsWith("SwapTotal:") ->
+                        swapTotalKb = line.trim().split(Regex("\\s+")).getOrNull(1)?.toLongOrNull() ?: 0L
+                    line.startsWith("SwapFree:") ->
+                        swapFreeKb = line.trim().split(Regex("\\s+")).getOrNull(1)?.toLongOrNull() ?: 0L
+                }
+            }
+        }
+        val swapTotal = swapTotalKb * 1024L
+        val swapFree = swapFreeKb * 1024L
+        return Memory(
+            totalBytes = mi.totalMem,
+            availBytes = mi.availMem,
+            thresholdBytes = mi.threshold,
+            lowMemory = mi.lowMemory,
+            swapTotalBytes = swapTotal,
+            swapUsedBytes = (swapTotal - swapFree).coerceAtLeast(0L),
+        )
     }
 
     // -- CPU ---------------------------------------------------------------------
