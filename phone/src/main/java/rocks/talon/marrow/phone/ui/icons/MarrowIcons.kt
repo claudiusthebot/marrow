@@ -217,6 +217,29 @@ object MarrowIcons {
             .stroke("M13.5 5 L10.5 19")
     }
 
+    /**
+     * GPU: a chip die with raised pads on top/bottom (GPU-die aesthetic).
+     * The rectangular body has evenly-spaced notched pads on the long edges,
+     * representing the VRAM/power pads visible on discrete and integrated dies.
+     */
+    val Gpu: ImageVector = marrow("Gpu") {
+        // Die body
+        stroke("M5 7 H19 V17 H5 Z")
+            // Top pads
+            .stroke("M8 7 V4")
+            .stroke("M12 7 V4")
+            .stroke("M16 7 V4")
+            // Bottom pads
+            .stroke("M8 17 V20")
+            .stroke("M12 17 V20")
+            .stroke("M16 17 V20")
+            // Inner core grid (3×2 cells suggesting shader clusters)
+            .stroke("M8 10 H16")
+            .stroke("M8 14 H16")
+            .stroke("M11 10 V14")
+            .stroke("M14 10 V14")
+    }
+
     /** Brand mark — small "M" tilted, used in the wordmark. */
     val Wordmark: ImageVector = marrow("Wordmark") {
         stroke("M4 19 V5 L12 13 L20 5 V19", width = 2.25f)
@@ -244,6 +267,7 @@ object MarrowIcons {
         Sections.CAMERAS -> Cameras
         Sections.BUILD_FLAGS -> BuildFlags
         Sections.SOFTWARE -> Software
+        Sections.GPU -> Gpu
         else -> Device
     }
 }

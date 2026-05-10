@@ -70,6 +70,7 @@ fun DeviceTab(
     val cpuCores by vm.cpuCores.collectAsState()
     val volumes by vm.volumes.collectAsState()
     val uptimeSeconds by vm.systemUptimeSeconds.collectAsState()
+    val gpu by vm.gpu.collectAsState()
 
     val cpuAvg = remember(cpuCores) { LiveStats.avgCurMhz(cpuCores) }
     val storageFrac = remember(volumes) { LiveStats.storageUsedFraction(volumes) }
@@ -145,7 +146,7 @@ fun DeviceTab(
                 items(sections, key = { it.id }) { section ->
                     SectionListCard(
                         section = section,
-                        livePreview = livePreviewFor(section, battery, memory, cpuAvg, volumes),
+                        livePreview = livePreviewFor(section, battery, memory, cpuAvg, volumes, gpu),
                         onClick = { onSection(section.id) },
                     )
                 }
@@ -269,6 +270,7 @@ private fun livePreviewFor(
     memory: LiveStats.Memory?,
     cpuAvg: Long,
     volumes: List<LiveStats.Volume>,
+    gpu: LiveStats.Gpu?,
 ): String? = when (section.id) {
     Sections.BATTERY -> battery?.percent?.takeIf { it >= 0 }?.let { "$it%" }
     Sections.MEMORY -> memory?.let {
@@ -279,6 +281,12 @@ private fun livePreviewFor(
         val total = volumes.sumOf { it.totalBytes }
         val avail = volumes.sumOf { it.availBytes }
         if (total > 0) "${formatBytesShort(total - avail)} used" else null
+    }
+    Sections.GPU -> gpu?.takeIf { it.available }?.let { g ->
+        buildString {
+            if (g.curMhz > 0) append("${g.curMhz} MHz")
+            if (g.usagePercent >= 0) append(" · ${g.usagePercent}%")
+        }.ifBlank { null }
     }
     else -> null
 }

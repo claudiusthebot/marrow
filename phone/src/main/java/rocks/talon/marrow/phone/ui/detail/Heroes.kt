@@ -601,6 +601,160 @@ private fun LegendDot(color: Color, label: String) {
     }
 }
 
+// -- GPU ---------------------------------------------------------------------
+
+@Composable
+fun GpuHero(vm: MarrowViewModel, section: Section) {
+    val gpu by vm.gpu.collectAsState()
+
+    // Frequency bar: currentFreq / maxFreq (0f when unavailable)
+    val freqFrac = gpu?.freqFraction ?: 0f
+    val animatedFreq by animateFloatAsState(targetValue = freqFrac, animationSpec = tween(500), label = "gpu-freq")
+
+    // Utilisation bar: usagePercent / 100 (-1 means not exposed by this SoC)
+    val util = gpu?.usagePercent ?: -1
+    val utilFrac = if (util in 0..100) util / 100f else -1f
+    val animatedUtil by animateFloatAsState(
+        targetValue = if (utilFrac >= 0f) utilFrac else 0f,
+        animationSpec = tween(500),
+        label = "gpu-util",
+    )
+
+    val curMhz = gpu?.curMhz ?: 0L
+    val maxMhz = gpu?.maxMhz ?: 0L
+    val minMhz = gpu?.minMhz ?: 0L
+    val governor = gpu?.governor ?: section.rows.firstOrNull { it.label == "Governor" }?.value
+    val available = gpu?.available ?: false
+
+    HeroBox {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconBadge(icon = MarrowIcons.Gpu, size = 44, cornerRadius = 14)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        if (available && curMhz > 0) "$curMhz MHz" else section.preview.ifBlank { "GPU" },
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    )
+                    Text(
+                        if (available && maxMhz > 0) {
+                            if (minMhz > 0) "$minMhz–$maxMhz MHz range" else "max $maxMhz MHz"
+                        } else {
+                            section.rows.firstOrNull { it.label == "GPU family" || it.label == "GPU driver" }?.value
+                                ?: "GPU info unavailable"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            if (available) {
+                Spacer(Modifier.height(20.dp))
+
+                // Frequency bar (always shown when available)
+                Text(
+                    "Frequency",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(18.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(animatedFreq)
+                            .height(18.dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.tertiary,
+                                    ),
+                                ),
+                            ),
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        if (minMhz > 0) "$minMhz MHz min" else "",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        if (maxMhz > 0) "$maxMhz MHz max" else "",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                // Utilisation bar — only when the SoC driver exposes it
+                if (utilFrac >= 0f) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Utilisation",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            "$util%",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(10.dp)
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(animatedUtil)
+                                .height(10.dp)
+                                .background(MaterialTheme.colorScheme.secondary),
+                        )
+                    }
+                }
+
+                // Governor chip
+                if (governor != null) {
+                    Spacer(Modifier.height(14.dp))
+                    SuggestionChip(
+                        onClick = {},
+                        label = { Text(governor, style = MaterialTheme.typography.labelSmall) },
+                    )
+                }
+            } else {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "GPU stats are unavailable on this device or emulator.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
 // -- Storage -----------------------------------------------------------------
 
 @Composable

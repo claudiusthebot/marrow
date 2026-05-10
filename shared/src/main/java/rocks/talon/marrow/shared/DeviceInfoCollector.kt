@@ -46,6 +46,7 @@ object DeviceInfoCollector {
             cameraSection(context)?.let { add(it) }
             add(buildFlagsSection())
             add(softwareSection(context))
+            gpuSection()?.let { add(it) }
         }
         return DeviceInfoSnapshot(
             capturedAtEpochMs = System.currentTimeMillis(),
@@ -456,6 +457,79 @@ object DeviceInfoCollector {
             }
         }
         return Section(Sections.BUILD_FLAGS, "Build flags", "flags", rows, "ID ${Build.ID}")
+    }
+
+    // -- GPU -----------------------------------------------------------------
+
+    /**
+     * Probes the GPU sysfs entries and returns a [Section] when at least one
+     * frequency value is readable. Returns null on emulators or devices where
+     * SELinux blocks access so the section is simply omitted rather than shown
+     * as "unavailable."
+     */
+    private fun gpuSection(): Section? {
+        val rows = mutableListOf<Row>()
+
+        // Qualcomm Adreno (kgsl) — most popular Android GPU family
+        val kgslDevfreq = "/sys/class/kgsl/kgsl-3d0/devfreq"
+        val kgslPath = File(kgslDevfreq)
+        if (kgslPath.exists()) {
+            val cur = readSysFile("$kgslDevfreq/cur_freq")?.trim()?.toLongOrNull()
+            val min = readSysFile("$kgslDevfreq/min_freq")?.trim()?.toLongOrNull()
+            val max = readSysFile("$kgslDevfreq/max_freq")?.trim()?.toLongOrNull()
+            val gov = readSysFile("$kgslDevfreq/governor")?.trim()
+            val busy = readSysFile("/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage")?.trim()?.toLongOrNull()
+
+            rows += Row("GPU family", "Adreno (Qualcomm Snapdragon)")
+            if (cur != null) rows += Row("Frequency (current)", "${cur / 1_000_000L} MHz")
+            if (min != null && max != null) rows += Row(
+                "Frequency range",
+                "${min / 1_000_000L}–${max / 1_000_000L} MHz",
+            )
+            if (gov != null) rows += Row("Governor", gov)
+            if (busy != null && busy in 0..100) rows += Row("Utilisation", "$busy%")
+
+            val preview = buildString {
+                if (cur != null) append("${cur / 1_000_000L} MHz")
+                if (busy != null && busy >= 0) append(" · $busy%")
+                if (gov != null) append(" · $gov")
+            }
+            return Section(Sections.GPU, "GPU", "gpu", rows, preview.ifBlank { "Adreno" })
+        }
+
+        // Generic devfreq — Mali, PowerVR, IMG GPU (Google Tensor), etc.
+        val gpuEntry = runCatching {
+            File("/sys/class/devfreq").listFiles()?.firstOrNull { f ->
+                val name = f.name.lowercase()
+                name.contains("gpu") || name.contains("mali") ||
+                    name.contains("pvr") || name.contains("rogue") ||
+                    name.contains("sgx") || name.contains("g3d")
+            }
+        }.getOrNull() ?: return null
+
+        val p = runCatching { gpuEntry.canonicalPath }.getOrElse { gpuEntry.absolutePath }
+        val cur = readSysFile("$p/cur_freq")?.trim()?.toLongOrNull()
+        val min = readSysFile("$p/min_freq")?.trim()?.toLongOrNull()
+        val max = readSysFile("$p/max_freq")?.trim()?.toLongOrNull()
+        val gov = readSysFile("$p/governor")?.trim()
+        val load = readSysFile("$p/load")?.trim()?.toLongOrNull()?.toInt()
+
+        if (cur == null && max == null) return null  // nothing readable
+
+        rows += Row("GPU driver", gpuEntry.name)
+        if (cur != null) rows += Row("Frequency (current)", "${cur / 1_000_000L} MHz")
+        if (min != null && max != null) rows += Row(
+            "Frequency range",
+            "${min / 1_000_000L}–${max / 1_000_000L} MHz",
+        )
+        if (gov != null) rows += Row("Governor", gov)
+        if (load != null && load in 0..100) rows += Row("Utilisation", "$load%")
+
+        val preview = buildString {
+            if (cur != null) append("${cur / 1_000_000L} MHz")
+            if (load != null && load >= 0) append(" · $load%")
+        }
+        return Section(Sections.GPU, "GPU", "gpu", rows, preview.ifBlank { gpuEntry.name })
     }
 
     // -- helpers -------------------------------------------------------------
