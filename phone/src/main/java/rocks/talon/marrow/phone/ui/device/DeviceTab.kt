@@ -81,7 +81,8 @@ fun DeviceTab(
         Build.MANUFACTURER?.replaceFirstChar { it.titlecase() } ?: "—"
     }
     val soc = remember {
-        (Build.SOC_MODEL?.takeIf { it.isNotBlank() && it != "unknown" } ?: Build.HARDWARE)
+        val socModel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL else null
+        (socModel?.takeIf { it.isNotBlank() && it != "unknown" } ?: Build.HARDWARE)
             ?.takeIf { it.isNotBlank() } ?: "—"
     }
     val androidVer = remember { "Android ${Build.VERSION.RELEASE ?: "?"}" }
