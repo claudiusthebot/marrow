@@ -13,8 +13,8 @@ android {
         applicationId = "rocks.talon.marrow"
         minSdk = 33  // Wear OS 4+; we target Pixel Watch 3 (Wear OS 6).
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.6.0"
+        versionCode = 9
+        versionName = "0.7.0"
     }
 
     buildTypes {
@@ -59,6 +59,19 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
     implementation("com.google.android.gms:play-services-wearable:19.0.0")
+
+    // Wear OS Tile (at-a-glance live stats on the watch face).
+    // Tiles pulls protolayout transitively; pinning explicit versions to
+    // avoid surprise upgrades during the wider AndroidX rev cycle.
+    implementation("androidx.wear.tiles:tiles:1.4.1")
+    implementation("androidx.wear.protolayout:protolayout:1.2.1")
+    implementation("androidx.wear.protolayout:protolayout-expression:1.2.1")
+    // Guava is required for `Futures.immediateFuture(...)` returned by the
+    // tile / resources callbacks. Tiles itself only consumes the
+    // `ListenableFuture` interface (provided by `concurrent-futures`), not
+    // the helper factories — so we add `guava` explicitly. The
+    // `-android` flavour avoids the JRE-only dependency on `j2objc-annotations`.
+    implementation("com.google.guava:guava:33.4.0-android")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
