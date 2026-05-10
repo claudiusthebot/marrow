@@ -47,6 +47,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val _memory = MutableStateFlow<LiveStats.Memory?>(null)
     val memory: StateFlow<LiveStats.Memory?> = _memory.asStateFlow()
 
+    /** Live CPU core frequency snapshots. Updated in the live loop. Empty list until
+     *  first tick, or on emulators / SELinux-restricted devices. */
+    private val _cpuCores = MutableStateFlow<List<LiveStats.CpuCore>>(emptyList())
+    val cpuCores: StateFlow<List<LiveStats.CpuCore>> = _cpuCores.asStateFlow()
+
     private var liveJob: Job? = null
 
     init {
@@ -70,13 +75,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Start the live battery/memory loop. Idempotent — safe to call repeatedly. */
+    /** Start the live battery/memory/CPU loop. Idempotent — safe to call repeatedly. */
     fun startLive() {
         if (liveJob?.isActive == true) return
         liveJob = viewModelScope.launch(Dispatchers.IO) {
             while (true) {
                 _battery.value = LiveStats.battery(getApplication())
                 _memory.value = LiveStats.memory(getApplication())
+                _cpuCores.value = LiveStats.cpuCores()
                 delay(10_000L)
             }
         }

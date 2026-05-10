@@ -357,8 +357,10 @@ private fun SectionDetailScreen(vm: WearViewModel, index: Int) {
     val refreshing by vm.refreshing.collectAsState()
     val section = remember(snapshot, index) { snapshot?.sections?.getOrNull(index) }
 
-    // Live 10s polling for Battery and Memory while on this detail screen.
-    val needsLive = section?.id == Sections.BATTERY || section?.id == Sections.MEMORY
+    // Live 10s polling for Battery, Memory, and CPU while on their detail screens.
+    val needsLive = section?.id == Sections.BATTERY ||
+        section?.id == Sections.MEMORY ||
+        section?.id == Sections.CPU
     DisposableEffect(needsLive) {
         if (needsLive) vm.startLive()
         onDispose { if (needsLive) vm.stopLive() }
@@ -366,6 +368,7 @@ private fun SectionDetailScreen(vm: WearViewModel, index: Int) {
 
     val battery by vm.battery.collectAsState()
     val memory by vm.memory.collectAsState()
+    val cpuCores by vm.cpuCores.collectAsState()
 
     val listState = rememberTransformingLazyColumnState()
     val transformSpec = rememberTransformationSpec()
@@ -425,6 +428,22 @@ private fun SectionDetailScreen(vm: WearViewModel, index: Int) {
                 item {
                     MemoryBarCard(
                         memory = memory!!,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .transformedHeight(this, transformSpec),
+                        transformation = SurfaceTransformation(transformSpec),
+                    )
+                }
+            }
+
+            // Frequency bar for CPU — shows avg current / max MHz live.
+            // Only renders when the live loop has populated at least one core with
+            // a non-zero max freq (i.e. the sysfs path was readable).
+            val cpuMaxMhz = cpuCores.maxOfOrNull { it.maxMhz } ?: 0L
+            if (section?.id == Sections.CPU && cpuMaxMhz > 0) {
+                item {
+                    CpuFreqCard(
+                        cores = cpuCores,
                         modifier = Modifier
                             .fillMaxWidth()
                             .transformedHeight(this, transformSpec),
@@ -607,6 +626,77 @@ private fun MemoryBarCard(
             }
             Text(
                 text = "${formatGib(memory.usedBytes)} / ${formatGib(memory.totalBytes)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Horizontal frequency bar for the CPU detail screen (Wear OS v0.5.0).
+ *
+ * Shows average current / max MHz across all cores as an animated bar,
+ * with a count of active cores (cur > 0) and the cluster max frequency
+ * as context. Mirrors the MemoryBarCard approach: bar + raw numbers below.
+ *
+ * Colour-codes by utilisation: <40% primary, 40–70% tertiary, >70% error.
+ *
+ * On emulators or SELinux-restricted watches, `cpuMaxMhz == 0` so the
+ * caller skips rendering this card entirely — no sentinel state needed.
+ *
+ * Live-updates every 10 s while the CPU detail screen is composed
+ * (driven by WearViewModel.startLive / stopLive via DisposableEffect).
+ */
+@Composable
+private fun CpuFreqCard(
+    cores: List<LiveStats.CpuCore>,
+    modifier: Modifier,
+    transformation: SurfaceTransformation,
+) {
+    val activeCores = cores.filter { it.curMhz > 0 }
+    val avgMhz = if (activeCores.isNotEmpty()) activeCores.sumOf { it.curMhz } / activeCores.size else 0L
+    val maxMhz = cores.maxOfOrNull { it.maxMhz } ?: 0L
+    val fraction = if (maxMhz > 0 && avgMhz > 0) (avgMhz.toFloat() / maxMhz.toFloat()).coerceIn(0f, 1f) else 0f
+    val barColor = when {
+        fraction > 0.70f -> MaterialTheme.colorScheme.error
+        fraction > 0.40f -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+    Card(
+        onClick = {},
+        modifier = modifier,
+        transformation = transformation,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = if (avgMhz > 0) "$avgMhz MHz avg" else "Reading…",
+                style = MaterialTheme.typography.labelLarge,
+                color = barColor,
+            )
+            // Frequency bar: current avg (barColor) over max (dim background)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)),
+            ) {
+                if (fraction > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(fraction)
+                            .background(barColor),
+                    )
+                }
+            }
+            Text(
+                text = "${activeCores.size}/${cores.size} cores active · max $maxMhz MHz",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
