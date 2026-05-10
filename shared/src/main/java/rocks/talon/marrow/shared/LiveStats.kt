@@ -424,6 +424,87 @@ object LiveStats {
         else -> "$bytesPerSec B/s"
     }
 
+    // -- GPU ---------------------------------------------------------------------
+
+    /**
+     * Live GPU snapshot: frequency, utilisation, and DVFS governor.
+     *
+     * Probes multiple sysfs paths in priority order:
+     * 1. **Qualcomm Adreno** — `/sys/class/kgsl/kgsl-3d0/devfreq/` for frequencies,
+     *    `/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage` for utilisation.
+     * 2. **Generic devfreq** — scans `/sys/class/devfreq/` for an entry whose
+     *    directory name contains "gpu", "mali", "pvr", "rogue", "sgx", or "g3d".
+     *
+     * Returns an unavailable [Gpu] (`available = false`) on emulators or when
+     * SELinux policy blocks access to GPU sysfs nodes.
+     */
+    data class Gpu(
+        /** Current frequency in MHz. 0 when unreadable. */
+        val curMhz: Long,
+        /** Minimum governor-allowed frequency in MHz. 0 when unreadable. */
+        val minMhz: Long,
+        /** Maximum governor-allowed frequency in MHz. 0 when unreadable. */
+        val maxMhz: Long,
+        /** Devfreq / kgsl governor name. null when unreadable. */
+        val governor: String?,
+        /**
+         * GPU utilisation 0–100. -1 when not exposed by this SoC's driver
+         * (most generic devfreq implementations lack a `load` or `busy_pct` file).
+         */
+        val usagePercent: Int,
+    ) {
+        /** Current frequency as a fraction of max (0f–1f). 0f when either value is 0. */
+        val freqFraction: Float
+            get() = if (maxMhz > 0 && curMhz > 0)
+                (curMhz.toFloat() / maxMhz.toFloat()).coerceIn(0f, 1f)
+            else 0f
+
+        /** true if at least one GPU frequency stat was readable from sysfs. */
+        val available: Boolean get() = maxMhz > 0
+    }
+
+    /**
+     * Read a single [Gpu] snapshot.
+     *
+     * Safe on any device — returns a zeroed sentinel rather than throwing when
+     * sysfs paths are absent or restricted by SELinux.
+     */
+    fun gpu(): Gpu {
+        // 1. Qualcomm Adreno (kgsl) — most popular Android GPU family.
+        //    Frequencies live in devfreq/ subdirectory; utilisation via gpu_busy_percentage.
+        val kgslDevfreq = "/sys/class/kgsl/kgsl-3d0/devfreq"
+        if (File("$kgslDevfreq/cur_freq").exists()) {
+            val cur = readLong("$kgslDevfreq/cur_freq") / 1_000_000L
+            val min = readLong("$kgslDevfreq/min_freq") / 1_000_000L
+            val max = readLong("$kgslDevfreq/max_freq") / 1_000_000L
+            val gov = readString("$kgslDevfreq/governor")
+            val busyPct = readLong("/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage").toInt()
+            return Gpu(cur, min, max, gov, if (busyPct in 0..100) busyPct else -1)
+        }
+        // 2. Generic devfreq — Mali, PowerVR, IMG GPU (Google Tensor), etc.
+        //    /sys/class/devfreq/ entries are symlinks; listFiles() follows them automatically.
+        val gpuEntry = runCatching {
+            File("/sys/class/devfreq").listFiles()
+                ?.firstOrNull { f ->
+                    val name = f.name.lowercase()
+                    name.contains("gpu") || name.contains("mali") ||
+                        name.contains("pvr") || name.contains("rogue") ||
+                        name.contains("sgx") || name.contains("g3d")
+                }
+        }.getOrNull()
+        if (gpuEntry != null) {
+            val p = runCatching { gpuEntry.canonicalPath }.getOrElse { gpuEntry.absolutePath }
+            val cur = readLong("$p/cur_freq") / 1_000_000L
+            val min = readLong("$p/min_freq") / 1_000_000L
+            val max = readLong("$p/max_freq") / 1_000_000L
+            val gov = readString("$p/governor")
+            // Some devfreq drivers expose a `load` integer (0–100) for GPU utilisation
+            val usage = readString("$p/load")?.trim()?.toLongOrNull()?.toInt() ?: -1
+            return Gpu(cur, min, max, gov, if (usage in 0..100) usage else -1)
+        }
+        return Gpu(0L, 0L, 0L, null, -1)
+    }
+
     // -- System uptime -----------------------------------------------------------
 
     /**

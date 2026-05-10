@@ -25,7 +25,7 @@ import rocks.talon.marrow.shared.LiveStats
  * App-wide state holder.
  *
  * - **Snapshot** for the phone (full collector dump) and watch (cached/live).
- * - **Live stats** (battery / memory / cpu / storage / cpu-temp / network / disk I/O / uptime)
+ * - **Live stats** (battery / memory / cpu / storage / cpu-temp / network / disk I/O / uptime / gpu)
  *   polled every refresh interval — used by the Device tab's hero/strip and per-section heroes.
  * - **Settings** stream from DataStore so the theme/interval react to changes.
  */
@@ -97,6 +97,15 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
      *  Empty until the first live-loop tick, or on emulators / restricted SELinux. */
     private val _thermalZones = MutableStateFlow<List<LiveStats.ThermalZone>>(emptyList())
     val thermalZones: StateFlow<List<LiveStats.ThermalZone>> = _thermalZones.asStateFlow()
+
+    /**
+     * Live GPU stats — current frequency, min/max, governor, and utilisation.
+     * null until the first live-loop tick.
+     * [LiveStats.Gpu.available] is false on emulators or devices where the GPU
+     * sysfs path is inaccessible (SELinux restriction, non-standard SoC layout).
+     */
+    private val _gpu = MutableStateFlow<LiveStats.Gpu?>(null)
+    val gpu: StateFlow<LiveStats.Gpu?> = _gpu.asStateFlow()
 
     // -- Settings ----------------------------------------------------------------
 
@@ -184,6 +193,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 prevCpuStat = cpuStat
                 // Thermal zones — all accessible zones ≥ 25 °C, sorted hottest-first
                 _thermalZones.value = LiveStats.thermalZones()
+                // GPU — frequency, utilisation, governor (kgsl or generic devfreq)
+                _gpu.value = LiveStats.gpu()
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }
