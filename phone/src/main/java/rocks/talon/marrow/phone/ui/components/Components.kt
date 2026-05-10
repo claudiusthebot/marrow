@@ -46,7 +46,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 
 /* -------------------------------------------------------------------------- */
 /* Marrow design system — surfaces, tiles, chips, progress, headings.          */
@@ -65,6 +64,10 @@ import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 /* Shapes: AbsoluteSmoothCornerShape(radius, 60) everywhere — 60 is the       */
 /* smoothness percent PixelPlayer uses (0=standard rounded, 100=full iOS      */
 /* squircle). Cards=28dp, tiles=18dp, hero=32dp.                              */
+/*                                                                             */
+/* AbsoluteSmoothCornerShape is defined locally in SmoothCornerShape.kt —     */
+/* the external io.github.racra dependency was removed (not on any public     */
+/* Maven repo; worked locally due to Android Studio's Gradle cache).          */
 /* -------------------------------------------------------------------------- */
 
 /* ---- Cards & surfaces --------------------------------------------------- */
