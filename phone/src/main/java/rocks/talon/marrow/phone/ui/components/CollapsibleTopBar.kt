@@ -84,7 +84,8 @@ class CollapsibleTopBarState(
 @Composable
 fun rememberCollapsibleTopBarState(): CollapsibleTopBarState {
     val density = LocalDensity.current
-    val statusBarH = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    // Use getTop(density) directly — avoids needing the asPaddingValues import.
+    val statusBarH = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
     val minPx = with(density) { (COLLAPSED_DP + statusBarH).toPx() }
     val maxPx = with(density) { EXPANDED_DP.toPx() }
     val anim = remember { Animatable(maxPx) }
