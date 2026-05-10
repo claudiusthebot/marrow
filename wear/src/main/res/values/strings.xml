@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Marrow</string>
+    <string name="tile_stats_label">Marrow Stats</string>
+    <string name="tile_stats_description">Live battery, memory, CPU and GPU at a glance.</string>
 </resources>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Static preview shown in the Wear OS tile gallery. Mirrors the live tile's
+    2x2 grid in approximate Talon-orange tones. Pure vector so it scales to
+    every watch size without bitmap artefacts.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="320dp"
+    android:viewportWidth="320"
+    android:viewportHeight="320">
+
+    <!-- Black background. -->
+    <path
+        android:pathData="M0,0 L320,0 L320,320 L0,320 Z"
+        android:fillColor="#FF000000" />
+
+    <!-- "MARROW" label. Approximate text via stroked rectangles
+         to keep the drawable resource self-contained. -->
+    <path
+        android:pathData="M125,72 L195,72 L195,80 L125,80 Z"
+        android:fillColor="#FFA08C82" />
+
+    <!-- Top-left cell: BAT (good — primary container). -->
+    <path
+        android:pathData="M48,108 L152,108 A18,18 0 0 1 170,126 L170,178 A18,18 0 0 1 152,196 L48,196 A18,18 0 0 1 30,178 L30,126 A18,18 0 0 1 48,108 Z"
+        android:fillColor="#FF7A3411" />
+
+    <!-- Top-right cell: MEM (ok — tertiary container). -->
+    <path
+        android:pathData="M186,108 L290,108 A18,18 0 0 1 308,126 L308,178 A18,18 0 0 1 290,196 L186,196 A18,18 0 0 1 168,178 L168,126 A18,18 0 0 1 186,108 Z"
+        android:fillColor="#FF52461D" />
+
+    <!-- Bottom-left cell: CPU (good). -->
+    <path
+        android:pathData="M48,212 L152,212 A18,18 0 0 1 170,230 L170,282 A18,18 0 0 1 152,300 L48,300 A18,18 0 0 1 30,282 L30,230 A18,18 0 0 1 48,212 Z"
+        android:fillColor="#FF7A3411" />
+
+    <!-- Bottom-right cell: GPU (good). -->
+    <path
+        android:pathData="M186,212 L290,212 A18,18 0 0 1 308,230 L308,282 A18,18 0 0 1 290,300 L186,300 A18,18 0 0 1 168,282 L168,230 A18,18 0 0 1 186,212 Z"
+        android:fillColor="#FF7A3411" />
+</vector>
