@@ -24,6 +24,8 @@ import rocks.talon.marrow.shared.LiveStats
 
 /**
  * Live stats strip — four metric tiles in a single row, equal-weighted.
+ * When the GPU driver exposes at least one readable stat, a fifth GPU tile
+ * is added automatically.
  *
  * Tile chrome matches PixelPlayer's `HeroMetricTile`: 18dp rounded corners,
  * surfaceContainerLow background, value above label, no inner icon. The
@@ -38,6 +40,7 @@ fun LiveStatsStrip(
     memory: LiveStats.Memory?,
     cpuAvgMhz: Long,
     storageUsedFraction: Float,
+    gpu: LiveStats.Gpu?,
     onChipClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -71,6 +74,21 @@ fun LiveStatsStrip(
             onClick = { onChipClick("storage") },
             modifier = Modifier.weight(1f),
         )
+        // GPU tile — only rendered when the driver exposes at least one
+        // readable frequency stat (gpu.available = maxMhz > 0). On emulators
+        // and SELinux-locked devices the tile is absent rather than showing "—".
+        if (gpu?.available == true) {
+            AnimatedTile(
+                label = "GPU",
+                value = when {
+                    gpu.usagePercent >= 0 -> "${gpu.usagePercent}%"
+                    gpu.curMhz > 0 -> "${gpu.curMhz} MHz"
+                    else -> "—"
+                },
+                onClick = { onChipClick("gpu") },
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
