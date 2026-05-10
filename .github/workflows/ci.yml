@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build debug APKs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Install Android SDK platform 36
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-36" \
+            2>&1 | tail -10
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build phone + wear debug APKs
+        run: ./gradlew :phone:assembleDebug :wear:assembleDebug --no-daemon
+
+      - name: Upload debug APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apks-${{ github.sha }}
+          path: |
+            phone/build/outputs/apk/debug/*.apk
+            wear/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Install Android SDK platform 36
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-36" \
+            2>&1 | tail -10
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Run Android lint
+        run: ./gradlew :phone:lintDebug :wear:lintDebug --no-daemon
+
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-reports
+          path: |
+            phone/build/reports/lint-results-debug.html
+            wear/build/reports/lint-results-debug.html
+          if-no-files-found: warn
