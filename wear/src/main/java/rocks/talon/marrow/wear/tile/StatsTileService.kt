@@ -142,22 +142,22 @@ class StatsTileService : TileService() {
                     .addContent(
                         statsRow(
                             leftLabel = "BAT",
-                            leftValue = formatPercent(batteryPct),
-                            leftColor = colorForBattery(batteryPct, batteryCharging),
+                            leftValue = StatsTilePalette.formatPercent(batteryPct),
+                            leftColor = StatsTilePalette.colorForBattery(batteryPct, batteryCharging),
                             rightLabel = "MEM",
-                            rightValue = formatPercent(memoryPct),
-                            rightColor = colorForLoad(memoryPct),
+                            rightValue = StatsTilePalette.formatPercent(memoryPct),
+                            rightColor = StatsTilePalette.colorForLoad(memoryPct),
                         ),
                     )
                     .addContent(spacer(SPACING_ROW))
                     .addContent(
                         statsRow(
                             leftLabel = "CPU",
-                            leftValue = formatPercent(cpuPct),
-                            leftColor = colorForLoad(cpuPct),
+                            leftValue = StatsTilePalette.formatPercent(cpuPct),
+                            leftColor = StatsTilePalette.colorForLoad(cpuPct),
                             rightLabel = "GPU",
-                            rightValue = formatPercent(gpuPct),
-                            rightColor = colorForLoad(gpuPct),
+                            rightValue = StatsTilePalette.formatPercent(gpuPct),
+                            rightColor = StatsTilePalette.colorForLoad(gpuPct),
                         ),
                     )
                     .build(),
@@ -246,26 +246,6 @@ class StatsTileService : TileService() {
             .setHeight(dp(value))
             .build()
 
-    private fun formatPercent(pct: Int): String =
-        if (pct < 0) "—" else "$pct%"
-
-    /** Comfort bands for "load"-style metrics (memory / CPU / GPU). */
-    private fun colorForLoad(pct: Int): Int = when {
-        pct < 0 -> COLOR_GOOD
-        pct < 40 -> COLOR_GOOD
-        pct < 70 -> COLOR_OK
-        else -> COLOR_WARN
-    }
-
-    /** Inverted bands for battery — low charge is the warning state. */
-    private fun colorForBattery(pct: Int, charging: Boolean): Int = when {
-        pct < 0 -> COLOR_GOOD
-        charging -> COLOR_GOOD
-        pct < 20 -> COLOR_WARN
-        pct < 50 -> COLOR_OK
-        else -> COLOR_GOOD
-    }
-
     private companion object {
         const val RESOURCES_VERSION = "marrow-stats-1"
         const val FRESHNESS_MS = 30_000L
@@ -279,10 +259,9 @@ class StatsTileService : TileService() {
         const val SPACING_ROW = 8f
         const val SPACING_CELL = 8f
 
-        // Talon orange family — mirrors `MarrowWearTheme.MarrowWearColors`.
-        const val COLOR_GOOD: Int = 0xFF7A3411.toInt()       // primaryContainer
-        const val COLOR_OK: Int = 0xFF52461D.toInt()         // tertiaryContainer
-        const val COLOR_WARN: Int = 0xFF93000A.toInt()       // errorContainer
+        // Text-tinting constants from the Talon orange family — mirrors
+        // `MarrowWearTheme.MarrowWearColors`. Background fills come from
+        // [StatsTilePalette].
         const val COLOR_VALUE: Int = 0xFFFFDBC9.toInt()      // onPrimaryContainer
         const val COLOR_LABEL: Int = 0xFFEDE0DA.toInt()      // onSurface
         const val COLOR_LABEL_DIM: Int = 0xFFA08C82.toInt()  // outline
