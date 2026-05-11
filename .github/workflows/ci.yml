@@ -82,3 +82,42 @@ jobs:
             phone/build/reports/lint-results-debug.html
             wear/build/reports/lint-results-debug.html
           if-no-files-found: warn
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Install Android SDK platform 36
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-36" \
+            2>&1 | tail -10
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Run shared + phone unit tests
+        run: ./gradlew :shared:testDebugUnitTest :phone:testDebugUnitTest --no-daemon
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: |
+            shared/build/reports/tests/testDebugUnitTest/
+            phone/build/reports/tests/testDebugUnitTest/
+            shared/build/test-results/testDebugUnitTest/
+            phone/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
