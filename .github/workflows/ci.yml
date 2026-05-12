@@ -107,8 +107,8 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Run shared + phone unit tests
-        run: ./gradlew :shared:testDebugUnitTest :phone:testDebugUnitTest --no-daemon
+      - name: Run shared + phone + wear unit tests
+        run: ./gradlew :shared:testDebugUnitTest :phone:testDebugUnitTest :wear:testDebugUnitTest --no-daemon
 
       - name: Upload test reports
         if: always()
@@ -118,6 +118,8 @@ jobs:
           path: |
             shared/build/reports/tests/testDebugUnitTest/
             phone/build/reports/tests/testDebugUnitTest/
+            wear/build/reports/tests/testDebugUnitTest/
             shared/build/test-results/testDebugUnitTest/
             phone/build/test-results/testDebugUnitTest/
+            wear/build/test-results/testDebugUnitTest/
           if-no-files-found: warn
