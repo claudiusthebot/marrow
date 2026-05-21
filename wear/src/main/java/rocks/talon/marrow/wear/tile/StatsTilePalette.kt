@@ -63,4 +63,18 @@ internal object StatsTilePalette {
         bytesPerSec >= 1_000L     -> "${bytesPerSec / 1_000}K"
         else                      -> "${bytesPerSec}B"
     }
+
+    /**
+     * Compact CPU/SoC temperature label for the tile footer.
+     *
+     * Returns the integer degrees with a degree symbol (e.g. "42°") for valid
+     * readings, or "—" for the [LiveStats.cpuTempC] sentinel value of -1f
+     * (returned when sysfs thermal zones are unreadable under emulator or a
+     * restrictive SELinux profile).
+     *
+     * Fractional degrees are intentionally truncated — 0.5 °C granularity is
+     * meaningless at watch-face glance distance and a whole-number value leaves
+     * more horizontal space for the network rates beside it.
+     */
+    fun formatTemp(tempC: Float): String = if (tempC < 0f) "—" else "${tempC.toInt()}°"
 }

@@ -33,9 +33,9 @@ import rocks.talon.marrow.shared.LiveStats
 
 /**
  * Wear OS tile that surfaces Marrow's headline live stats as a 2×2 grid of
- * coloured pills plus a compact network-throughput row beneath them.
+ * coloured pills plus a compact footer row beneath them.
  *
- * Layout (v0.8.0):
+ * Layout (v0.9.0):
  * ```
  *        MARROW
  *  ┌──────────┐ ┌──────────┐
@@ -46,12 +46,18 @@ import rocks.talon.marrow.shared.LiveStats
  *  │  18%     │ │   2%     │
  *  │  CPU     │ │  GPU     │
  *  └──────────┘ └──────────┘
- *      ↓ 1.2M  ↑ 345K
+ *      ↓ 1.2M  ↑ 345K  · 42°
  * ```
  *
  * Cell tints follow the same comfort bands as the phone's section cards:
  * green-ish (low load) → tertiary (medium) → error red (high). Battery is
  * inverted — low percent reads as warning. Charging always reads green.
+ *
+ * The footer row shows three live signals:
+ *  - receive throughput (↓) and transmit throughput (↑) — sampled across the
+ *    same 180 ms window as CPU utilisation so no extra blocking is added
+ *  - CPU/SoC temperature (·) — read from /sys/class/thermal at the same time;
+ *    shows "—" when sysfs is inaccessible (emulator / SELinux restriction)
  *
  * The tile re-evaluates every 30 s when visible. CPU% and network rate are
  * sampled by comparing two `/proc/stat` and `/proc/net/dev` snapshots across
@@ -67,14 +73,22 @@ import rocks.talon.marrow.shared.LiveStats
  */
 class StatsTileService : TileService() {
 
-    /** Container for the two metrics sampled across the 180 ms delta window. */
-    private data class DeltaStats(
+    /**
+     * Container for all metrics that require either a delta window or a
+     * sysfs read taken at request time.
+     *
+     * CPU and network are sampled across the same 180 ms blocking window.
+     * Temperature is read once, at the end of the window (sysfs is cheap).
+     */
+    private data class DynamicStats(
         /** Total CPU utilisation 0–100, or -1 when /proc/stat is unreadable. */
         val cpuPct: Int,
         /** Network receive rate in bytes/sec. */
         val rxBps: Long,
         /** Network transmit rate in bytes/sec. */
         val txBps: Long,
+        /** CPU/SoC thermal temperature in °C, or -1f when sysfs is unreadable. */
+        val tempC: Float,
     )
 
     override fun onTileRequest(
@@ -82,7 +96,7 @@ class StatsTileService : TileService() {
     ): ListenableFuture<Tile> {
         val battery = LiveStats.battery(applicationContext)
         val memory = LiveStats.memory(applicationContext)
-        val delta = sampleDeltaStats()
+        val dynamic = sampleDynamicStats()
         val gpu = LiveStats.gpu()
         val gpuPct = when {
             gpu.usagePercent in 0..100 -> gpu.usagePercent
@@ -94,10 +108,11 @@ class StatsTileService : TileService() {
             batteryPct = battery.percent,
             batteryCharging = battery.charging,
             memoryPct = memory.usedPercent,
-            cpuPct = delta.cpuPct,
+            cpuPct = dynamic.cpuPct,
             gpuPct = gpuPct,
-            rxBps = delta.rxBps,
-            txBps = delta.txBps,
+            rxBps = dynamic.rxBps,
+            txBps = dynamic.txBps,
+            tempC = dynamic.tempC,
         )
 
         val tile = Tile.Builder()
@@ -126,12 +141,14 @@ class StatsTileService : TileService() {
 
     /**
      * Two-snapshot CPU utilisation AND network rate — both sampled across the
-     * same 180 ms window so no additional blocking is introduced.
+     * same 180 ms window so no additional blocking is introduced. CPU/SoC
+     * temperature is read at the end of the window (cheap sysfs call).
      *
      * Returns cpuPct = -1 when /proc/stat is unreadable (emulator / SELinux).
      * Network rates default to 0 when /proc/net/dev is unreadable.
+     * Temperature defaults to -1f when sysfs thermal zones are unreadable.
      */
-    private fun sampleDeltaStats(): DeltaStats {
+    private fun sampleDynamicStats(): DynamicStats {
         val cpuFirst = LiveStats.cpuStatSnapshot()
         val netFirst = LiveStats.networkSnapshot()
         Thread.sleep(180L)
@@ -141,7 +158,8 @@ class StatsTileService : TileService() {
             LiveStats.cpuUsagePercent(cpuFirst, cpuSecond).toInt()
         else -1
         val (rxBps, txBps) = LiveStats.networkRate(netFirst, netSecond)
-        return DeltaStats(cpuPct, rxBps, txBps)
+        val tempC = LiveStats.cpuTempC()
+        return DynamicStats(cpuPct, rxBps, txBps, tempC)
     }
 
     private fun buildLayout(
@@ -152,6 +170,7 @@ class StatsTileService : TileService() {
         gpuPct: Int,
         rxBps: Long,
         txBps: Long,
+        tempC: Float,
     ): LayoutElement {
         return Box.Builder()
             .setWidth(expand())
@@ -199,7 +218,7 @@ class StatsTileService : TileService() {
                         ),
                     )
                     .addContent(spacer(SPACING_NET))
-                    .addContent(networkRow(rxBps, txBps))
+                    .addContent(networkRow(rxBps, txBps, tempC))
                     .build(),
             )
             .build()
@@ -233,12 +252,17 @@ class StatsTileService : TileService() {
             .build()
 
     /**
-     * Compact "↓ RX  ↑ TX" network row spanning the full tile width.
+     * Compact footer row spanning the full tile width with three live signals:
      *
-     * Rates are formatted as "1.2M", "345K", or "123B" (no "/s" — space is
-     * tight). A rate of 0 appears as "0B" so the row never goes blank.
+     * ```
+     *   ↓ 1.2M  ↑ 345K  · 42°
+     * ```
+     *
+     * Rates formatted as "1.2M", "345K", "123B" (no "/s" — space is tight).
+     * Temperature formatted as "42°" or "—" when sysfs is unreadable.
+     * The middle-dot (·) visually separates throughput from thermal.
      */
-    private fun networkRow(rxBps: Long, txBps: Long): LayoutElement =
+    private fun networkRow(rxBps: Long, txBps: Long, tempC: Float): LayoutElement =
         Box.Builder()
             .setWidth(expand())
             .setHeight(dp(NET_ROW_HEIGHT))
@@ -248,7 +272,8 @@ class StatsTileService : TileService() {
                 Text.Builder()
                     .setText(
                         "↓ ${StatsTilePalette.formatNetRate(rxBps)}" +
-                            "  ↑ ${StatsTilePalette.formatNetRate(txBps)}",
+                            "  ↑ ${StatsTilePalette.formatNetRate(txBps)}" +
+                            "  · ${StatsTilePalette.formatTemp(tempC)}",
                     )
                     .setFontStyle(
                         FontStyle.Builder()
@@ -315,13 +340,13 @@ class StatsTileService : TileService() {
             .build()
 
     private companion object {
-        const val RESOURCES_VERSION = "marrow-stats-2"
+        const val RESOURCES_VERSION = "marrow-stats-3"
         const val FRESHNESS_MS = 30_000L
 
         // Layout dimensions (dp).
         const val OUTER_PADDING = 12f
         const val CELL_WIDTH = 70f
-        // Trimmed 56 → 52 to make room for the network row below the 2×2 grid.
+        // Trimmed 56 → 52 to make room for the network/temp footer row.
         // Total height: 12 + 11 + 8 + 52 + 8 + 52 + 6 + 22 + 12 ≈ 183 dp.
         // Pixel Watch 3 round display ≈ 205 dp — fits with comfortable margin.
         const val CELL_HEIGHT = 52f
