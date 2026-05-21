@@ -181,4 +181,33 @@ class StatsTilePaletteTest {
         // 100 MB/s gigabit Ethernet — renders cleanly, no overflow
         assertEquals("100.0M", StatsTilePalette.formatNetRate(100_000_000L))
     }
+
+    // --- formatTemp: compact CPU/SoC temperature label ---
+
+    @Test
+    fun `formatTemp renders em-dash for the negative sentinel`() {
+        assertEquals("—", StatsTilePalette.formatTemp(-1f))
+        assertEquals("—", StatsTilePalette.formatTemp(-0.1f))
+        assertEquals("—", StatsTilePalette.formatTemp(-100f))
+        assertEquals("—", StatsTilePalette.formatTemp(Float.NEGATIVE_INFINITY))
+    }
+
+    @Test
+    fun `formatTemp renders zero as 0 degrees`() {
+        assertEquals("0°", StatsTilePalette.formatTemp(0f))
+    }
+
+    @Test
+    fun `formatTemp truncates fractional degrees`() {
+        // toInt() truncates toward zero — 36.9 → 36, 40.0 → 40
+        assertEquals("36°", StatsTilePalette.formatTemp(36.7f))
+        assertEquals("40°", StatsTilePalette.formatTemp(40.9f))
+    }
+
+    @Test
+    fun `formatTemp renders typical Wear OS CPU temperatures`() {
+        assertEquals("37°", StatsTilePalette.formatTemp(37f))
+        assertEquals("55°", StatsTilePalette.formatTemp(55f))
+        assertEquals("72°", StatsTilePalette.formatTemp(72f))
+    }
 }
