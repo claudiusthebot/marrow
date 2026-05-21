@@ -77,4 +77,17 @@ internal object StatsTilePalette {
      * more horizontal space for the network rates beside it.
      */
     fun formatTemp(tempC: Float): String = if (tempC < 0f) "—" else "${tempC.toInt()}°"
+
+    /**
+     * Compact session-peak temperature label for the tile header.
+     *
+     * Returns the integer degrees with a degree symbol and a trailing up-arrow
+     * (e.g. "42°↑") for a valid peak reading, or an empty string when no valid
+     * sample has been observed yet (sentinel < 0).
+     *
+     * The up-arrow visually distinguishes the session-peak from the live
+     * temperature shown in the footer's `· 42°` slot.
+     */
+    fun formatPeakTemp(peakTempC: Float): String =
+        if (peakTempC < 0f) "" else "${peakTempC.toInt()}°↑"
 }

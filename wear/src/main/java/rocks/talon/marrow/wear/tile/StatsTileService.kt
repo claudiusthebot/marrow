@@ -35,9 +35,9 @@ import rocks.talon.marrow.shared.LiveStats
  * Wear OS tile that surfaces Marrow's headline live stats as a 2×2 grid of
  * coloured pills plus a compact footer row beneath them.
  *
- * Layout (v0.9.0):
+ * Layout (v0.10.0):
  * ```
- *        MARROW
+ *        MARROW  42°↑
  *  ┌──────────┐ ┌──────────┐
  *  │  67%     │ │  42%     │
  *  │  BAT     │ │  MEM     │
@@ -52,6 +52,11 @@ import rocks.talon.marrow.shared.LiveStats
  * Cell tints follow the same comfort bands as the phone's section cards:
  * green-ish (low load) → tertiary (medium) → error red (high). Battery is
  * inverted — low percent reads as warning. Charging always reads green.
+ *
+ * The header shows a session-peak temperature (e.g. "42°↑") when at least
+ * one valid thermal reading has been collected since the tile service started.
+ * This lets the user spot "my phone hit 87°C at some point today" even if the
+ * current temperature has since dropped.
  *
  * The footer row shows three live signals:
  *  - receive throughput (↓) and transmit throughput (↑) — sampled across the
@@ -72,6 +77,20 @@ import rocks.talon.marrow.shared.LiveStats
  * platform default of launching the app's main activity.
  */
 class StatsTileService : TileService() {
+
+    /**
+     * Session-peak CPU/SoC temperature in °C, or -1f when no valid sample
+     * has been collected yet.
+     *
+     * Updated on every [onTileRequest] call. Survives across tile refreshes
+     * for as long as this service instance lives — typically from when the
+     * tile first becomes visible until the watch face is unloaded or the app
+     * is killed. Effectively "since last boot" in normal use.
+     *
+     * Not persisted to disk — intentionally ephemeral. The goal is a quick
+     * "did my phone run hot today?" glance, not long-term thermal history.
+     */
+    private var peakTempC: Float = -1f
 
     /**
      * Container for all metrics that require either a delta window or a
@@ -104,6 +123,11 @@ class StatsTileService : TileService() {
             else -> -1
         }
 
+        // Update session-peak temperature.
+        if (dynamic.tempC >= 0f && (peakTempC < 0f || dynamic.tempC > peakTempC)) {
+            peakTempC = dynamic.tempC
+        }
+
         val root = buildLayout(
             batteryPct = battery.percent,
             batteryCharging = battery.charging,
@@ -113,6 +137,7 @@ class StatsTileService : TileService() {
             rxBps = dynamic.rxBps,
             txBps = dynamic.txBps,
             tempC = dynamic.tempC,
+            peakTempC = peakTempC,
         )
 
         val tile = Tile.Builder()
@@ -171,6 +196,7 @@ class StatsTileService : TileService() {
         rxBps: Long,
         txBps: Long,
         tempC: Float,
+        peakTempC: Float,
     ): LayoutElement {
         return Box.Builder()
             .setWidth(expand())
@@ -194,7 +220,7 @@ class StatsTileService : TileService() {
                     .setWidth(expand())
                     .setHeight(expand())
                     .setHorizontalAlignment(HORIZONTAL_ALIGN_CENTER)
-                    .addContent(header())
+                    .addContent(header(peakTempC))
                     .addContent(spacer(SPACING_HEADER))
                     .addContent(
                         statsRow(
@@ -224,9 +250,16 @@ class StatsTileService : TileService() {
             .build()
     }
 
-    private fun header(): LayoutElement =
-        Text.Builder()
-            .setText("MARROW")
+    /**
+     * Title row. Shows "MARROW" when no valid peak has been collected yet;
+     * shows "MARROW  42°↑" once a thermal reading is available so the user
+     * can glance at the session-high temperature without any extra tap.
+     */
+    private fun header(peakTempC: Float): LayoutElement {
+        val peakSuffix = StatsTilePalette.formatPeakTemp(peakTempC)
+        val label = if (peakSuffix.isNotEmpty()) "MARROW  $peakSuffix" else "MARROW"
+        return Text.Builder()
+            .setText(label)
             .setFontStyle(
                 FontStyle.Builder()
                     .setSize(sp(11f))
@@ -234,6 +267,7 @@ class StatsTileService : TileService() {
                     .build(),
             )
             .build()
+    }
 
     private fun statsRow(
         leftLabel: String,
@@ -340,7 +374,7 @@ class StatsTileService : TileService() {
             .build()
 
     private companion object {
-        const val RESOURCES_VERSION = "marrow-stats-3"
+        const val RESOURCES_VERSION = "marrow-stats-4"
         const val FRESHNESS_MS = 30_000L
 
         // Layout dimensions (dp).

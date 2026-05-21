@@ -210,4 +210,32 @@ class StatsTilePaletteTest {
         assertEquals("55°", StatsTilePalette.formatTemp(55f))
         assertEquals("72°", StatsTilePalette.formatTemp(72f))
     }
+
+    // --- formatPeakTemp: session-peak label for the tile header ---
+
+    @Test
+    fun `formatPeakTemp returns empty string when no valid peak (sentinel)`() {
+        assertEquals("", StatsTilePalette.formatPeakTemp(-1f))
+        assertEquals("", StatsTilePalette.formatPeakTemp(-0.1f))
+        assertEquals("", StatsTilePalette.formatPeakTemp(Float.NEGATIVE_INFINITY))
+    }
+
+    @Test
+    fun `formatPeakTemp renders zero degrees with up-arrow`() {
+        assertEquals("0°↑", StatsTilePalette.formatPeakTemp(0f))
+    }
+
+    @Test
+    fun `formatPeakTemp renders typical peak temperatures with up-arrow`() {
+        assertEquals("42°↑", StatsTilePalette.formatPeakTemp(42f))
+        assertEquals("87°↑", StatsTilePalette.formatPeakTemp(87f))
+        assertEquals("95°↑", StatsTilePalette.formatPeakTemp(95f))
+    }
+
+    @Test
+    fun `formatPeakTemp truncates fractional degrees`() {
+        // Same truncation as formatTemp — toInt() toward zero.
+        assertEquals("95°↑", StatsTilePalette.formatPeakTemp(95.9f))
+        assertEquals("72°↑", StatsTilePalette.formatPeakTemp(72.1f))
+    }
 }
