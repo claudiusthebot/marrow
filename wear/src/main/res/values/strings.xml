@@ -3,4 +3,8 @@
     <string name="app_name">Marrow</string>
     <string name="tile_stats_label">Marrow Stats</string>
     <string name="tile_stats_description">Live battery, memory, CPU and GPU at a glance.</string>
+    <string name="notification_channel_thermal_name">Thermal Alert</string>
+    <string name="notification_channel_thermal_desc">Alerts when the SoC temperature stays above 80°C for 60+ seconds.</string>
+    <string name="notification_thermal_title">Thermal Alert</string>
+    <string name="notification_thermal_text">SoC temperature: %1$.0f°C — sustained high heat detected</string>
 </resources>
