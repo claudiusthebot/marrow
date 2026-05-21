@@ -12,6 +12,8 @@ import androidx.wear.protolayout.LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER
 import androidx.wear.protolayout.LayoutElementBuilders.Layout
 import androidx.wear.protolayout.LayoutElementBuilders.LayoutElement
 import androidx.wear.protolayout.LayoutElementBuilders.Row
+import androidx.wear.protolayout.LayoutElementBuilders.Spannable
+import androidx.wear.protolayout.LayoutElementBuilders.SpanText
 import androidx.wear.protolayout.LayoutElementBuilders.Spacer
 import androidx.wear.protolayout.LayoutElementBuilders.Text
 import androidx.wear.protolayout.LayoutElementBuilders.VERTICAL_ALIGN_CENTER
@@ -35,7 +37,7 @@ import rocks.talon.marrow.shared.LiveStats
  * Wear OS tile that surfaces Marrow's headline live stats as a 2×2 grid of
  * coloured pills plus a compact footer row beneath them.
  *
- * Layout (v0.10.0):
+ * Layout (v0.11.0):
  * ```
  *        MARROW  42°↑
  *  ┌──────────┐ ┌──────────┐
@@ -48,6 +50,10 @@ import rocks.talon.marrow.shared.LiveStats
  *  └──────────┘ └──────────┘
  *      ↓ 1.2M  ↑ 345K  · 42°
  * ```
+ *
+ * The footer temperature segment is rendered as a separate [SpanText] span
+ * inside a [Spannable] so it can carry its own colour — amber at 50–69°C,
+ * soft red at ≥ 70°C. Below 50°C it inherits the normal label tint.
  *
  * Cell tints follow the same comfort bands as the phone's section cards:
  * green-ish (low load) → tertiary (medium) → error red (high). Battery is
@@ -73,8 +79,8 @@ import rocks.talon.marrow.shared.LiveStats
  * blocked under restrictive SELinux profiles) shows "—" and stays at the
  * calm primary tint instead of flashing red.
  *
- * The tile is intentionally non-interactive — taps fall through to the
- * platform default of launching the app's main activity.
+ * Taps fall through to the platform default of launching the app's main
+ * activity.
  */
 class StatsTileService : TileService() {
 
@@ -295,29 +301,44 @@ class StatsTileService : TileService() {
      * Rates formatted as "1.2M", "345K", "123B" (no "/s" — space is tight).
      * Temperature formatted as "42°" or "—" when sysfs is unreadable.
      * The middle-dot (·) visually separates throughput from thermal.
+     *
+     * The temperature segment is rendered as a separate [SpanText] inside a
+     * [Spannable] so it can carry its own colour:
+     *   < 50°C  → normal label tint (calm)
+     *   50–69°C → amber  ([StatsTilePalette.COLOR_TEMP_WARM])
+     *   ≥ 70°C  → soft red ([StatsTilePalette.COLOR_TEMP_HOT])
      */
-    private fun networkRow(rxBps: Long, txBps: Long, tempC: Float): LayoutElement =
-        Box.Builder()
+    private fun networkRow(rxBps: Long, txBps: Long, tempC: Float): LayoutElement {
+        val tempColor = StatsTilePalette.colorForTemp(tempC, COLOR_LABEL)
+        val footerStyle = FontStyle.Builder().setSize(sp(10f)).setColor(argb(COLOR_LABEL)).build()
+        val tempStyle   = FontStyle.Builder().setSize(sp(10f)).setColor(argb(tempColor)).build()
+        return Box.Builder()
             .setWidth(expand())
             .setHeight(dp(NET_ROW_HEIGHT))
             .setVerticalAlignment(VERTICAL_ALIGN_CENTER)
             .setHorizontalAlignment(HORIZONTAL_ALIGN_CENTER)
             .addContent(
-                Text.Builder()
-                    .setText(
-                        "↓ ${StatsTilePalette.formatNetRate(rxBps)}" +
-                            "  ↑ ${StatsTilePalette.formatNetRate(txBps)}" +
-                            "  · ${StatsTilePalette.formatTemp(tempC)}",
+                Spannable.Builder()
+                    .addSpan(
+                        SpanText.Builder()
+                            .setText(
+                                "↓ ${StatsTilePalette.formatNetRate(rxBps)}" +
+                                    "  ↑ ${StatsTilePalette.formatNetRate(txBps)}" +
+                                    "  · ",
+                            )
+                            .setFontStyle(footerStyle)
+                            .build(),
                     )
-                    .setFontStyle(
-                        FontStyle.Builder()
-                            .setSize(sp(10f))
-                            .setColor(argb(COLOR_LABEL))
+                    .addSpan(
+                        SpanText.Builder()
+                            .setText(StatsTilePalette.formatTemp(tempC))
+                            .setFontStyle(tempStyle)
                             .build(),
                     )
                     .build(),
             )
             .build()
+    }
 
     @androidx.annotation.OptIn(ProtoLayoutExperimental::class)
     private fun cell(label: String, value: String, bg: Int): LayoutElement =
@@ -374,7 +395,7 @@ class StatsTileService : TileService() {
             .build()
 
     private companion object {
-        const val RESOURCES_VERSION = "marrow-stats-4"
+        const val RESOURCES_VERSION = "marrow-stats-5"
         const val FRESHNESS_MS = 30_000L
 
         // Layout dimensions (dp).
