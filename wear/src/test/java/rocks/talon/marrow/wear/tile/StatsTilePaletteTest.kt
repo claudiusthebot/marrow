@@ -238,4 +238,42 @@ class StatsTilePaletteTest {
         assertEquals("95°↑", StatsTilePalette.formatPeakTemp(95.9f))
         assertEquals("72°↑", StatsTilePalette.formatPeakTemp(72.1f))
     }
+
+    // --- colorForTemp: 3-band text color for the footer temperature ---
+
+    /**
+     * A stand-in for the tile service's `COLOR_LABEL` — passed in as the
+     * "normal" tint so [StatsTilePalette] stays independent of tile constants.
+     */
+    private val NORMAL_COLOR = 0xFFEDE0DA.toInt()
+
+    @Test
+    fun `colorForTemp returns normal color for unavailable sentinel`() {
+        assertEquals(NORMAL_COLOR, StatsTilePalette.colorForTemp(-1f, NORMAL_COLOR))
+        assertEquals(NORMAL_COLOR, StatsTilePalette.colorForTemp(-0.1f, NORMAL_COLOR))
+        assertEquals(NORMAL_COLOR, StatsTilePalette.colorForTemp(Float.NEGATIVE_INFINITY, NORMAL_COLOR))
+    }
+
+    @Test
+    fun `colorForTemp returns normal color below 50 degrees`() {
+        // Typical Wear OS idle range — no colour tint.
+        assertEquals(NORMAL_COLOR, StatsTilePalette.colorForTemp(0f, NORMAL_COLOR))
+        assertEquals(NORMAL_COLOR, StatsTilePalette.colorForTemp(37f, NORMAL_COLOR))
+        assertEquals(NORMAL_COLOR, StatsTilePalette.colorForTemp(49.9f, NORMAL_COLOR))
+    }
+
+    @Test
+    fun `colorForTemp flips to TEMP_WARM at 50 degrees`() {
+        assertEquals(StatsTilePalette.COLOR_TEMP_WARM, StatsTilePalette.colorForTemp(50f, NORMAL_COLOR))
+        assertEquals(StatsTilePalette.COLOR_TEMP_WARM, StatsTilePalette.colorForTemp(55f, NORMAL_COLOR))
+        assertEquals(StatsTilePalette.COLOR_TEMP_WARM, StatsTilePalette.colorForTemp(69.9f, NORMAL_COLOR))
+    }
+
+    @Test
+    fun `colorForTemp flips to TEMP_HOT at 70 degrees`() {
+        assertEquals(StatsTilePalette.COLOR_TEMP_HOT, StatsTilePalette.colorForTemp(70f, NORMAL_COLOR))
+        assertEquals(StatsTilePalette.COLOR_TEMP_HOT, StatsTilePalette.colorForTemp(87f, NORMAL_COLOR))
+        assertEquals(StatsTilePalette.COLOR_TEMP_HOT, StatsTilePalette.colorForTemp(100f, NORMAL_COLOR))
+        assertEquals(StatsTilePalette.COLOR_TEMP_HOT, StatsTilePalette.colorForTemp(Float.MAX_VALUE, NORMAL_COLOR))
+    }
 }

@@ -17,6 +17,12 @@ internal object StatsTilePalette {
     /** Background fill for a metric in the "warning / high" band. */
     const val COLOR_WARN: Int = 0xFF5C3030.toInt()    // darkened errorContainer
 
+    /** Text tint for a warm-but-not-alarming temperature reading (50–69°C). */
+    const val COLOR_TEMP_WARM: Int = 0xFFCCAA66.toInt()  // amber-ish warm
+
+    /** Text tint for a hot temperature reading (≥ 70°C). */
+    const val COLOR_TEMP_HOT: Int = 0xFFFF8888.toInt()   // soft red
+
     /**
      * 3-band colour for load metrics (memory, CPU, GPU):
      *   < 40 → GOOD  |  40–69 → OK  |  ≥ 70 → WARN
@@ -90,4 +96,29 @@ internal object StatsTilePalette {
      */
     fun formatPeakTemp(peakTempC: Float): String =
         if (peakTempC < 0f) "" else "${peakTempC.toInt()}°↑"
+
+    /**
+     * Text color for the live temperature reading in the footer row.
+     *
+     * Three-band threshold — same thresholds as `colorForLoad` but tuned for
+     * °C rather than percent.  Wear OS SoC temperatures at idle sit in the
+     * 35–48 °C range; light load tops out around 55 °C; sustained load or a
+     * warm environment can push 65–75 °C.
+     *
+     *   < 50 °C → [normalLabelColor]  (calm — pass in `COLOR_LABEL` from the caller)
+     *   50–69°C → [COLOR_TEMP_WARM]   (elevated, amber tint — worth noticing)
+     *   ≥ 70 °C → [COLOR_TEMP_HOT]    (hot, soft red — act on it)
+     *
+     * Negative sentinel (unavailable) → [normalLabelColor].
+     *
+     * The [normalLabelColor] is supplied by the caller rather than hard-coded
+     * here so [StatsTilePalette] stays independent of the tile service's colour
+     * constants.
+     */
+    fun colorForTemp(tempC: Float, normalLabelColor: Int): Int = when {
+        tempC < 0f  -> normalLabelColor
+        tempC < 50f -> normalLabelColor
+        tempC < 70f -> COLOR_TEMP_WARM
+        else        -> COLOR_TEMP_HOT
+    }
 }
