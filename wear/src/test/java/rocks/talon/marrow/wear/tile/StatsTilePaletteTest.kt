@@ -137,4 +137,48 @@ class StatsTilePaletteTest {
         // about whatever it's handed so a clamp bug is visible on-screen.
         assertEquals("150%", StatsTilePalette.formatPercent(150))
     }
+
+    // --- formatNetRate: compact byte-rate label for the network row ---
+
+    @Test
+    fun `formatNetRate renders zero as 0B`() {
+        assertEquals("0B", StatsTilePalette.formatNetRate(0L))
+    }
+
+    @Test
+    fun `formatNetRate stays in B below 1000`() {
+        assertEquals("1B", StatsTilePalette.formatNetRate(1L))
+        assertEquals("999B", StatsTilePalette.formatNetRate(999L))
+    }
+
+    @Test
+    fun `formatNetRate flips to K at 1000`() {
+        assertEquals("1K", StatsTilePalette.formatNetRate(1_000L))
+    }
+
+    @Test
+    fun `formatNetRate stays in K below 1000000`() {
+        // 1500 B/s → integer K truncates to 1K (not rounded)
+        assertEquals("1K", StatsTilePalette.formatNetRate(1_500L))
+        // 999 999 B/s → 999K
+        assertEquals("999K", StatsTilePalette.formatNetRate(999_999L))
+    }
+
+    @Test
+    fun `formatNetRate flips to M at 1000000`() {
+        assertEquals("1.0M", StatsTilePalette.formatNetRate(1_000_000L))
+    }
+
+    @Test
+    fun `formatNetRate shows one decimal for M`() {
+        assertEquals("1.5M", StatsTilePalette.formatNetRate(1_500_000L))
+        // 12 345 678 B/s → 12.3M (%.1f truncates — no rounding surprises)
+        assertEquals("12.3M", StatsTilePalette.formatNetRate(12_345_678L))
+    }
+
+    @Test
+    fun `formatNetRate handles large rates defensively`() {
+        // 100 MB/s gigabit Ethernet — renders cleanly, no overflow
+        assertEquals("100.0M", StatsTilePalette.formatNetRate(100_000_000L))
+    }
 }

@@ -32,35 +32,57 @@ import com.google.common.util.concurrent.ListenableFuture
 import rocks.talon.marrow.shared.LiveStats
 
 /**
- * Wear OS tile that surfaces Marrow's four headline live stats — battery,
- * memory pressure, total CPU utilisation, GPU utilisation — as a 2×2 grid
- * of coloured pills.
+ * Wear OS tile that surfaces Marrow's headline live stats as a 2×2 grid of
+ * coloured pills plus a compact network-throughput row beneath them.
+ *
+ * Layout (v0.8.0):
+ * ```
+ *        MARROW
+ *  ┌──────────┐ ┌──────────┐
+ *  │  67%     │ │  42%     │
+ *  │  BAT     │ │  MEM     │
+ *  └──────────┘ └──────────┘
+ *  ┌──────────┐ ┌──────────┐
+ *  │  18%     │ │   2%     │
+ *  │  CPU     │ │  GPU     │
+ *  └──────────┘ └──────────┘
+ *      ↓ 1.2M  ↑ 345K
+ * ```
  *
  * Cell tints follow the same comfort bands as the phone's section cards:
  * green-ish (low load) → tertiary (medium) → error red (high). Battery is
  * inverted — low percent reads as warning. Charging always reads green.
  *
- * The tile re-evaluates every 30 s when visible. CPU% is sampled by
- * comparing two `/proc/stat` snapshots ~180 ms apart on the request thread,
- * which is deliberately blocking — the tile platform schedules our work
- * off the UI thread already and a sub-200 ms tile request is well within
- * the 5 s budget.
+ * The tile re-evaluates every 30 s when visible. CPU% and network rate are
+ * sampled by comparing two `/proc/stat` and `/proc/net/dev` snapshots across
+ * the same ~180 ms window on the tile request thread — deliberately blocking
+ * but well within the platform's 5 s tile-request budget.
  *
- * Hardware that doesn't expose a metric (GPU sysfs missing on the Pixel
- * Watch, `/proc/stat` blocked under restrictive SELinux profiles) shows
- * "—" and stays at the calm primary tint instead of flashing red.
+ * Hardware that doesn't expose a metric (GPU sysfs missing, `/proc/stat`
+ * blocked under restrictive SELinux profiles) shows "—" and stays at the
+ * calm primary tint instead of flashing red.
  *
  * The tile is intentionally non-interactive — taps fall through to the
  * platform default of launching the app's main activity.
  */
 class StatsTileService : TileService() {
 
+    /** Container for the two metrics sampled across the 180 ms delta window. */
+    private data class DeltaStats(
+        /** Total CPU utilisation 0–100, or -1 when /proc/stat is unreadable. */
+        val cpuPct: Int,
+        /** Network receive rate in bytes/sec. */
+        val rxBps: Long,
+        /** Network transmit rate in bytes/sec. */
+        val txBps: Long,
+    )
+
     override fun onTileRequest(
         requestParams: TileRequest,
     ): ListenableFuture<Tile> {
         val battery = LiveStats.battery(applicationContext)
         val memory = LiveStats.memory(applicationContext)
-        val cpuPct = sampleCpuPercent()
+        val delta = sampleDeltaStats()
         val gpu = LiveStats.gpu()
         val gpuPct = when {
             gpu.usagePercent in 0..100 -> gpu.usagePercent
@@ -72,8 +94,10 @@ class StatsTileService : TileService() {
             batteryPct = battery.percent,
             batteryCharging = battery.charging,
             memoryPct = memory.usedPercent,
-            cpuPct = cpuPct,
+            cpuPct = delta.cpuPct,
             gpuPct = gpuPct,
+            rxBps = delta.rxBps,
+            txBps = delta.txBps,
         )
 
         val tile = Tile.Builder()
@@ -100,12 +124,24 @@ class StatsTileService : TileService() {
             Resources.Builder().setVersion(RESOURCES_VERSION).build(),
         )
 
-    /** Two-snapshot total CPU utilisation. Returns -1 when /proc/stat is blocked. */
-    private fun sampleCpuPercent(): Int {
-        val first = LiveStats.cpuStatSnapshot() ?: return -1
+    /**
+     * Two-snapshot CPU utilisation AND network rate — both sampled across the
+     * same 180 ms window so no additional blocking is introduced.
+     *
+     * Returns cpuPct = -1 when /proc/stat is unreadable (emulator / SELinux).
+     * Network rates default to 0 when /proc/net/dev is unreadable.
+     */
+    private fun sampleDeltaStats(): DeltaStats {
+        val cpuFirst = LiveStats.cpuStatSnapshot()
+        val netFirst = LiveStats.networkSnapshot()
         Thread.sleep(180L)
-        val second = LiveStats.cpuStatSnapshot() ?: return -1
-        return LiveStats.cpuUsagePercent(first, second).toInt()
+        val cpuSecond = LiveStats.cpuStatSnapshot()
+        val netSecond = LiveStats.networkSnapshot()
+        val cpuPct = if (cpuFirst != null && cpuSecond != null)
+            LiveStats.cpuUsagePercent(cpuFirst, cpuSecond).toInt()
+        else -1
+        val (rxBps, txBps) = LiveStats.networkRate(netFirst, netSecond)
+        return DeltaStats(cpuPct, rxBps, txBps)
     }
 
     private fun buildLayout(
@@ -114,6 +150,8 @@ class StatsTileService : TileService() {
         memoryPct: Int,
         cpuPct: Int,
         gpuPct: Int,
+        rxBps: Long,
+        txBps: Long,
     ): LayoutElement {
         return Box.Builder()
             .setWidth(expand())
@@ -160,6 +198,8 @@ class StatsTileService : TileService() {
                             rightColor = StatsTilePalette.colorForLoad(gpuPct),
                         ),
                     )
+                    .addContent(spacer(SPACING_NET))
+                    .addContent(networkRow(rxBps, txBps))
                     .build(),
             )
             .build()
@@ -190,6 +230,34 @@ class StatsTileService : TileService() {
             .addContent(cell(leftLabel, leftValue, leftColor))
             .addContent(spacer(SPACING_CELL))
             .addContent(cell(rightLabel, rightValue, rightColor))
+            .build()
+
+    /**
+     * Compact "↓ RX  ↑ TX" network row spanning the full tile width.
+     *
+     * Rates are formatted as "1.2M", "345K", or "123B" (no "/s" — space is
+     * tight). A rate of 0 appears as "0B" so the row never goes blank.
+     */
+    private fun networkRow(rxBps: Long, txBps: Long): LayoutElement =
+        Box.Builder()
+            .setWidth(expand())
+            .setHeight(dp(NET_ROW_HEIGHT))
+            .setVerticalAlignment(VERTICAL_ALIGN_CENTER)
+            .setHorizontalAlignment(HORIZONTAL_ALIGN_CENTER)
+            .addContent(
+                Text.Builder()
+                    .setText(
+                        "↓ ${StatsTilePalette.formatNetRate(rxBps)}" +
+                            "  ↑ ${StatsTilePalette.formatNetRate(txBps)}",
+                    )
+                    .setFontStyle(
+                        FontStyle.Builder()
+                            .setSize(sp(10f))
+                            .setColor(argb(COLOR_LABEL))
+                            .build(),
+                    )
+                    .build(),
+            )
             .build()
 
     @androidx.annotation.OptIn(ProtoLayoutExperimental::class)
@@ -247,17 +315,22 @@ class StatsTileService : TileService() {
             .build()
 
     private companion object {
-        const val RESOURCES_VERSION = "marrow-stats-1"
+        const val RESOURCES_VERSION = "marrow-stats-2"
         const val FRESHNESS_MS = 30_000L
 
         // Layout dimensions (dp).
         const val OUTER_PADDING = 12f
         const val CELL_WIDTH = 70f
-        const val CELL_HEIGHT = 56f
+        // Trimmed 56 → 52 to make room for the network row below the 2×2 grid.
+        // Total height: 12 + 11 + 8 + 52 + 8 + 52 + 6 + 22 + 12 ≈ 183 dp.
+        // Pixel Watch 3 round display ≈ 205 dp — fits with comfortable margin.
+        const val CELL_HEIGHT = 52f
         const val CELL_RADIUS = 18f
         const val SPACING_HEADER = 8f
         const val SPACING_ROW = 8f
         const val SPACING_CELL = 8f
+        const val SPACING_NET = 6f
+        const val NET_ROW_HEIGHT = 22f
 
         // Text-tinting constants from the Talon orange family — mirrors
         // `MarrowWearTheme.MarrowWearColors`. Background fills come from
