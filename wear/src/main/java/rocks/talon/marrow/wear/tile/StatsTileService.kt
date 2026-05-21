@@ -1,5 +1,9 @@
 package rocks.talon.marrow.wear.tile
 
+import android.app.NotificationManager
+import android.content.Context
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
 import androidx.wear.protolayout.DimensionBuilders.dp
@@ -34,6 +38,7 @@ import androidx.wear.tiles.TileService
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import rocks.talon.marrow.shared.LiveStats
+import rocks.talon.marrow.wear.R
 
 /**
  * Wear OS tile that surfaces Marrow's headline live stats as a 2×2 grid of
@@ -104,6 +109,25 @@ class StatsTileService : TileService() {
     private var peakTempC: Float = -1f
 
     /**
+     * Number of consecutive tile refreshes where the measured temperature
+     * was >= [ThermalAlert.THRESHOLD_C].
+     *
+     * Reset to 0 whenever temperature drops below the threshold OR immediately
+     * after a thermal alert fires (so the user needs another sustained-hot
+     * streak before the next notification).
+     */
+    private var hotStreakCount: Int = 0
+
+    /**
+     * Epoch milliseconds when the most recent thermal notification was posted,
+     * or 0L if none has been posted this session.
+     *
+     * Used to enforce [ThermalAlert.COOLDOWN_MS] between successive alerts so
+     * the user isn't spammed when temperature is hovering around the threshold.
+     */
+    private var lastAlertMs: Long = 0L
+
+    /**
      * Container for all metrics that require either a delta window or a
      * sysfs read taken at request time.
      *
@@ -137,6 +161,21 @@ class StatsTileService : TileService() {
         // Update session-peak temperature.
         if (dynamic.tempC >= 0f && (peakTempC < 0f || dynamic.tempC > peakTempC)) {
             peakTempC = dynamic.tempC
+        }
+
+        // Thermal alert: fire a notification when the SoC stays hot for a
+        // sustained period. Decision is made BEFORE updating hotStreakCount so
+        // the pure helper receives the pre-update count.
+        val nowMs = System.currentTimeMillis()
+        if (ThermalAlert.shouldAlert(dynamic.tempC, hotStreakCount, lastAlertMs, nowMs)) {
+            fireThermalNotification(dynamic.tempC)
+            lastAlertMs = nowMs
+            hotStreakCount = 0  // require a fresh streak before the next alert
+        }
+        if (dynamic.tempC >= ThermalAlert.THRESHOLD_C) {
+            hotStreakCount++
+        } else {
+            hotStreakCount = 0
         }
 
         val root = buildLayout(
@@ -413,6 +452,42 @@ class StatsTileService : TileService() {
             .setWidth(dp(value))
             .setHeight(dp(value))
             .build()
+
+    /**
+     * Posts a high-priority Wear OS notification warning the user that the
+     * SoC has been running hot.
+     *
+     * Silently no-ops if [POST_NOTIFICATIONS] permission has not been granted
+     * (which should never happen on Wear OS 4+ where the permission is
+     * pre-granted for on-device apps, but is handled defensively).
+     */
+    private fun fireThermalNotification(tempC: Float) {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            ?: return
+        if (nm.importance == NotificationManager.IMPORTANCE_NONE) return
+
+        val title = getString(R.string.notification_thermal_title)
+        val text  = getString(R.string.notification_thermal_text, tempC)
+
+        val notification = NotificationCompat.Builder(this, ThermalAlert.CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setAutoCancel(true)
+            .build()
+
+        // NotificationManagerCompat handles the POST_NOTIFICATIONS permission
+        // check on API 33+ gracefully (throws SecurityException if missing,
+        // which we swallow rather than crash the tile refresh).
+        try {
+            NotificationManagerCompat.from(this)
+                .notify(ThermalAlert.NOTIFICATION_ID, notification)
+        } catch (_: SecurityException) {
+            // POST_NOTIFICATIONS not granted — skip silently.
+        }
+    }
 
     private companion object {
         const val RESOURCES_VERSION = "marrow-stats-6"
