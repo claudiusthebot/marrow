@@ -1,5 +1,6 @@
 package rocks.talon.marrow.wear.tile
 
+import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
 import androidx.wear.protolayout.DimensionBuilders.dp
 import androidx.wear.protolayout.DimensionBuilders.expand
@@ -18,6 +19,7 @@ import androidx.wear.protolayout.LayoutElementBuilders.Spacer
 import androidx.wear.protolayout.LayoutElementBuilders.Text
 import androidx.wear.protolayout.LayoutElementBuilders.VERTICAL_ALIGN_CENTER
 import androidx.wear.protolayout.ModifiersBuilders.Background
+import androidx.wear.protolayout.ModifiersBuilders.Clickable
 import androidx.wear.protolayout.ModifiersBuilders.Corner
 import androidx.wear.protolayout.ModifiersBuilders.Modifiers
 import androidx.wear.protolayout.ModifiersBuilders.Padding
@@ -37,7 +39,7 @@ import rocks.talon.marrow.shared.LiveStats
  * Wear OS tile that surfaces Marrow's headline live stats as a 2×2 grid of
  * coloured pills plus a compact footer row beneath them.
  *
- * Layout (v0.11.0):
+ * Layout (v0.12.0):
  * ```
  *        MARROW  42°↑
  *  ┌──────────┐ ┌──────────┐
@@ -50,6 +52,12 @@ import rocks.talon.marrow.shared.LiveStats
  *  └──────────┘ └──────────┘
  *      ↓ 1.2M  ↑ 345K  · 42°
  * ```
+ *
+ * Tapping anywhere on the tile opens [MainActivity] — the Marrow stats
+ * screen. An explicit [ActionBuilders.LaunchAction] with a typed
+ * [ActionBuilders.AndroidActivity] target replaces the old implicit
+ * platform-default behaviour, guaranteeing the correct destination on
+ * all Wear OS 4+ devices.
  *
  * The footer temperature segment is rendered as a separate [SpanText] span
  * inside a [Spannable] so it can carry its own colour — amber at 50–69°C,
@@ -78,9 +86,6 @@ import rocks.talon.marrow.shared.LiveStats
  * Hardware that doesn't expose a metric (GPU sysfs missing, `/proc/stat`
  * blocked under restrictive SELinux profiles) shows "—" and stays at the
  * calm primary tint instead of flashing red.
- *
- * Taps fall through to the platform default of launching the app's main
- * activity.
  */
 class StatsTileService : TileService() {
 
@@ -204,6 +209,15 @@ class StatsTileService : TileService() {
         tempC: Float,
         peakTempC: Float,
     ): LayoutElement {
+        val launchAction = ActionBuilders.LaunchAction.Builder()
+            .setAndroidActivity(
+                ActionBuilders.AndroidActivity.Builder()
+                    .setPackageName(packageName)
+                    .setClassName("rocks.talon.marrow.wear.MainActivity")
+                    .build(),
+            )
+            .build()
+
         return Box.Builder()
             .setWidth(expand())
             .setHeight(expand())
@@ -211,6 +225,12 @@ class StatsTileService : TileService() {
             .setHorizontalAlignment(HORIZONTAL_ALIGN_CENTER)
             .setModifiers(
                 Modifiers.Builder()
+                    .setClickable(
+                        Clickable.Builder()
+                            .setId("open_main")
+                            .setOnClick(launchAction)
+                            .build(),
+                    )
                     .setPadding(
                         Padding.Builder()
                             .setStart(dp(OUTER_PADDING))
@@ -395,7 +415,7 @@ class StatsTileService : TileService() {
             .build()
 
     private companion object {
-        const val RESOURCES_VERSION = "marrow-stats-5"
+        const val RESOURCES_VERSION = "marrow-stats-6"
         const val FRESHNESS_MS = 30_000L
 
         // Layout dimensions (dp).
