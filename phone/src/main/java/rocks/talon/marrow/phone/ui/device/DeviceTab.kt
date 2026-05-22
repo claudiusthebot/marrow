@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import rocks.talon.marrow.phone.BuildConfig
 import rocks.talon.marrow.phone.MarrowViewModel
 import rocks.talon.marrow.phone.ui.components.CollapsibleTopBar
 import rocks.talon.marrow.phone.ui.components.LiveStatsStrip
@@ -256,7 +257,7 @@ private fun Footer() {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "Marrow v1.3.0",
+            text = "Marrow v${BuildConfig.VERSION_NAME}",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
