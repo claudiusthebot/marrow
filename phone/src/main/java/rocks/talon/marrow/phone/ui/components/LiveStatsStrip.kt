@@ -33,12 +33,17 @@ import rocks.talon.marrow.shared.LiveStats
  *
  * Tap any tile → invokes `onChipClick(sectionId)` so the host can navigate to
  * the matching section detail.
+ *
+ * CPU tile (v0.14.0): prefers [cpuUsagePercent] (0–100 from /proc/stat delta)
+ * when ≥ 0; falls back to [cpuAvgMhz] MHz on restricted SELinux profiles where
+ * /proc/stat is blocked. Usage-percent matches what the Wear tile already shows.
  */
 @Composable
 fun LiveStatsStrip(
     battery: LiveStats.Battery?,
     memory: LiveStats.Memory?,
     cpuAvgMhz: Long,
+    cpuUsagePercent: Float = -1f,
     storageUsedFraction: Float,
     gpu: LiveStats.Gpu?,
     onChipClick: (String) -> Unit,
@@ -62,9 +67,14 @@ fun LiveStatsStrip(
             onClick = { onChipClick("memory") },
             modifier = Modifier.weight(1f),
         )
+        // CPU: prefer usage% (more legible) over avg MHz, fall back when /proc/stat blocked.
         AnimatedTile(
-            label = "CPU avg",
-            value = if (cpuAvgMhz > 0) "$cpuAvgMhz MHz" else "—",
+            label = "CPU",
+            value = when {
+                cpuUsagePercent >= 0f -> "${cpuUsagePercent.toInt()}%"
+                cpuAvgMhz > 0 -> "$cpuAvgMhz MHz"
+                else -> "—"
+            },
             onClick = { onChipClick("cpu") },
             modifier = Modifier.weight(1f),
         )
