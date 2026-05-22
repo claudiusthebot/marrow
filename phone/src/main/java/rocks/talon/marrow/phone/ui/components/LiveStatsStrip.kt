@@ -23,8 +23,8 @@ import androidx.compose.runtime.Composable
 import rocks.talon.marrow.shared.LiveStats
 
 /**
- * Live stats strip — four metric tiles in a single row, equal-weighted.
- * When the GPU driver exposes at least one readable stat, a fifth GPU tile
+ * Live stats strip — metric tiles in a single row, equal-weighted.
+ * When the GPU driver exposes at least one readable stat, a GPU tile
  * is added automatically.
  *
  * Tile chrome matches PixelPlayer's `HeroMetricTile`: 18dp rounded corners,
@@ -37,6 +37,11 @@ import rocks.talon.marrow.shared.LiveStats
  * CPU tile (v0.14.0): prefers [cpuUsagePercent] (0–100 from /proc/stat delta)
  * when ≥ 0; falls back to [cpuAvgMhz] MHz on restricted SELinux profiles where
  * /proc/stat is blocked. Usage-percent matches what the Wear tile already shows.
+ *
+ * Net tile (v0.15.0): total throughput (rx + tx) as KB/s or MB/s, matching the
+ * Wear tile. Always present so the strip layout is stable — shows "—" until the
+ * second live-loop tick produces a rate delta. Tapping navigates to the Network
+ * section for per-interface detail.
  */
 @Composable
 fun LiveStatsStrip(
@@ -46,6 +51,7 @@ fun LiveStatsStrip(
     cpuUsagePercent: Float = -1f,
     storageUsedFraction: Float,
     gpu: LiveStats.Gpu?,
+    networkRate: Pair<Long, Long> = 0L to 0L,
     onChipClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -84,6 +90,18 @@ fun LiveStatsStrip(
             onClick = { onChipClick("storage") },
             modifier = Modifier.weight(1f),
         )
+        // Net tile — total throughput (rx + tx). Always shown so the strip
+        // layout stays stable; "—" until the second tick produces a rate delta.
+        AnimatedTile(
+            label = "Net",
+            value = run {
+                val (rx, tx) = networkRate
+                val total = rx + tx
+                if (total <= 0L) "—" else formatNetRate(total)
+            },
+            onClick = { onChipClick("network") },
+            modifier = Modifier.weight(1f),
+        )
         // GPU tile — only rendered when the driver exposes at least one
         // readable frequency stat (gpu.available = maxMhz > 0). On emulators
         // and SELinux-locked devices the tile is absent rather than showing "—".
@@ -100,6 +118,13 @@ fun LiveStatsStrip(
             )
         }
     }
+}
+
+/** Format a bytes-per-second throughput rate as a short human-readable string. */
+private fun formatNetRate(bytesPerSec: Long): String = when {
+    bytesPerSec >= 1_048_576L -> "%.1f MB/s".format(bytesPerSec / 1_048_576.0)
+    bytesPerSec >= 1_024L -> "${bytesPerSec / 1_024} KB/s"
+    else -> "$bytesPerSec B/s"
 }
 
 @Composable

@@ -71,6 +71,7 @@ fun DeviceTab(
     val volumes by vm.volumes.collectAsState()
     val uptimeSeconds by vm.systemUptimeSeconds.collectAsState()
     val gpu by vm.gpu.collectAsState()
+    val networkRate by vm.networkRate.collectAsState()
 
     val cpuAvg = remember(cpuCores) { LiveStats.avgCurMhz(cpuCores) }
     val cpuUsagePercent by vm.cpuUsagePercent.collectAsState()
@@ -126,6 +127,7 @@ fun DeviceTab(
                     cpuUsagePercent = cpuUsagePercent,
                     storageUsedFraction = storageFrac,
                     gpu = gpu,
+                    networkRate = networkRate,
                     onChipClick = onSection,
                 )
             }
@@ -150,7 +152,10 @@ fun DeviceTab(
                 items(sections, key = { it.id }) { section ->
                     SectionListCard(
                         section = section,
-                        livePreview = livePreviewFor(section, battery, memory, cpuAvg, volumes, gpu, cpuUsagePercent),
+                        livePreview = livePreviewFor(
+                            section, battery, memory, cpuAvg, volumes, gpu,
+                            cpuUsagePercent, networkRate,
+                        ),
                         onClick = { onSection(section.id) },
                     )
                 }
@@ -276,6 +281,7 @@ private fun livePreviewFor(
     volumes: List<LiveStats.Volume>,
     gpu: LiveStats.Gpu?,
     cpuUsagePercent: Float = -1f,
+    networkRate: Pair<Long, Long> = 0L to 0L,
 ): String? = when (section.id) {
     Sections.BATTERY -> battery?.percent?.takeIf { it >= 0 }?.let { "$it%" }
     Sections.MEMORY -> memory?.let {
@@ -298,7 +304,19 @@ private fun livePreviewFor(
             if (g.usagePercent >= 0) append(" · ${g.usagePercent}%")
         }.ifBlank { null }
     }
+    Sections.NETWORK -> {
+        val (rx, tx) = networkRate
+        val total = rx + tx
+        if (total <= 0L) null else formatNetRate(total)
+    }
     else -> null
+}
+
+/** Format a bytes-per-second throughput rate as a short human-readable string. */
+private fun formatNetRate(bytesPerSec: Long): String = when {
+    bytesPerSec >= 1_048_576L -> "%.1f MB/s".format(bytesPerSec / 1_048_576.0)
+    bytesPerSec >= 1_024L -> "${bytesPerSec / 1_024} KB/s"
+    else -> "$bytesPerSec B/s"
 }
 
 private fun formatBytesShort(bytes: Long): String {
