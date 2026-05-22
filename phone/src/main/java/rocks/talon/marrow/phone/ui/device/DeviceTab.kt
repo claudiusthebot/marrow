@@ -73,6 +73,7 @@ fun DeviceTab(
     val gpu by vm.gpu.collectAsState()
 
     val cpuAvg = remember(cpuCores) { LiveStats.avgCurMhz(cpuCores) }
+    val cpuUsagePercent by vm.cpuUsagePercent.collectAsState()
     val storageFrac = remember(volumes) { LiveStats.storageUsedFraction(volumes) }
     val uptimeFormatted = remember(uptimeSeconds) { LiveStats.formatUptime(uptimeSeconds) }
 
@@ -122,6 +123,7 @@ fun DeviceTab(
                     battery = battery,
                     memory = memory,
                     cpuAvgMhz = cpuAvg,
+                    cpuUsagePercent = cpuUsagePercent,
                     storageUsedFraction = storageFrac,
                     gpu = gpu,
                     onChipClick = onSection,
@@ -148,7 +150,7 @@ fun DeviceTab(
                 items(sections, key = { it.id }) { section ->
                     SectionListCard(
                         section = section,
-                        livePreview = livePreviewFor(section, battery, memory, cpuAvg, volumes, gpu),
+                        livePreview = livePreviewFor(section, battery, memory, cpuAvg, volumes, gpu, cpuUsagePercent),
                         onClick = { onSection(section.id) },
                     )
                 }
@@ -273,12 +275,18 @@ private fun livePreviewFor(
     cpuAvg: Long,
     volumes: List<LiveStats.Volume>,
     gpu: LiveStats.Gpu?,
+    cpuUsagePercent: Float = -1f,
 ): String? = when (section.id) {
     Sections.BATTERY -> battery?.percent?.takeIf { it >= 0 }?.let { "$it%" }
     Sections.MEMORY -> memory?.let {
         "${formatBytesShort(it.usedBytes)} / ${formatBytesShort(it.totalBytes)}"
     }
-    Sections.CPU -> if (cpuAvg > 0) "$cpuAvg MHz" else null
+    // Prefer usage % when /proc/stat is readable; fall back to avg MHz.
+    Sections.CPU -> when {
+        cpuUsagePercent >= 0f -> "${cpuUsagePercent.toInt()}% CPU"
+        cpuAvg > 0 -> "$cpuAvg MHz"
+        else -> null
+    }
     Sections.STORAGE -> {
         val total = volumes.sumOf { it.totalBytes }
         val avail = volumes.sumOf { it.availBytes }
