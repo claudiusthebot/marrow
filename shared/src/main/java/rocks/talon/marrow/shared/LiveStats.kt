@@ -8,6 +8,7 @@ import android.os.BatteryManager
 import android.os.Environment
 import android.os.StatFs
 import java.io.File
+import kotlin.math.roundToInt
 
 /**
  * Lightweight, polled snapshots of the device's most-watched stats. Designed
@@ -30,6 +31,9 @@ object LiveStats {
         val currentMa: Int,               // Int.MIN_VALUE unknown
         val technology: String,
         val healthy: Boolean,
+        /** Battery wear level: charge_full / charge_full_design × 100.
+         *  -1 when the sysfs nodes are absent or unreadable (emulator / OEM restriction). */
+        val healthPercent: Int = -1,      // 0..100, -1 unknown
     ) {
         enum class PlugType { UNPLUGGED, AC, USB, WIRELESS, DOCK }
     }
@@ -56,6 +60,10 @@ object LiveStats {
         val healthInt = intent?.getIntExtra(BatteryManager.EXTRA_HEALTH, -1) ?: -1
         val tech = intent?.getStringExtra(BatteryManager.EXTRA_TECHNOLOGY) ?: "?"
         val current = mgr?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) ?: Int.MIN_VALUE
+        val healthPct = batteryHealthPercent(
+            readLong("/sys/class/power_supply/battery/charge_full"),
+            readLong("/sys/class/power_supply/battery/charge_full_design"),
+        )
         return Battery(
             percent = percent,
             charging = charging,
@@ -65,7 +73,28 @@ object LiveStats {
             currentMa = if (current != Int.MIN_VALUE) current / 1000 else Int.MIN_VALUE,
             technology = tech,
             healthy = healthInt == BatteryManager.BATTERY_HEALTH_GOOD || healthInt == -1,
+            healthPercent = healthPct,
         )
+    }
+
+    /**
+     * Battery wear percentage from sysfs capacity nodes.
+     *
+     * Both [chargeFull] and [chargeFullDesign] are typically in µAh, but the
+     * calculation is unit-agnostic — only their ratio matters.
+     * OEMs use two common paths; the collector always passes the standard path:
+     *   /sys/class/power_supply/battery/charge_full          (actual max)
+     *   /sys/class/power_supply/battery/charge_full_design   (factory spec)
+     *
+     * Returns -1 when either value is ≤ 0 (absent sysfs node, emulator,
+     * or OEM using a non-standard power_supply name like "bms" or "BAT0").
+     *
+     * Exposed as a pure function for unit testability — no filesystem access here.
+     */
+    fun batteryHealthPercent(chargeFull: Long, chargeFullDesign: Long): Int {
+        if (chargeFull <= 0 || chargeFullDesign <= 0) return -1
+        return ((chargeFull.toFloat() / chargeFullDesign.toFloat()) * 100f)
+            .roundToInt().coerceIn(0, 100)
     }
 
     // -- Memory ------------------------------------------------------------------
