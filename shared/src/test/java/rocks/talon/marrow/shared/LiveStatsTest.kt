@@ -406,4 +406,46 @@ class LiveStatsTest {
         // Both absent (emulator path) — no div-by-zero, just sentinel.
         assertEquals(-1, LiveStats.batteryHealthPercent(0L, 0L))
     }
+
+    // ── powerMw ────────────────────────────────────────────────────────────────
+
+    private fun makeBattery(
+        voltageV: Float = 3.85f,
+        currentMa: Int = -1000,
+    ): LiveStats.Battery = LiveStats.Battery(
+        percent = 80,
+        charging = currentMa > 0,
+        plugged = LiveStats.Battery.PlugType.UNPLUGGED,
+        temperatureC = 30f,
+        voltageV = voltageV,
+        currentMa = currentMa,
+        technology = "Li-ion",
+        healthy = true,
+        healthPercent = 95,
+    )
+
+    @Test fun powerMw_chargingPositive() {
+        val b = makeBattery(voltageV = 4.1f, currentMa = 1800)
+        assertEquals(7380, b.powerMw)                        // 4.1V × 1800mA ≈ 7380mW (rounded)
+    }
+
+    @Test fun powerMw_dischargingNegative() {
+        val b = makeBattery(voltageV = 3.85f, currentMa = -1500)
+        assertEquals(-5775, b.powerMw)                       // 3.85V × −1500mA ≈ −5775mW (rounded)
+    }
+
+    @Test fun powerMw_unavailableCurrentMa() {
+        val b = makeBattery(voltageV = 3.8f, currentMa = Int.MIN_VALUE)
+        assertEquals(Int.MIN_VALUE, b.powerMw)
+    }
+
+    @Test fun powerMw_unavailableVoltage() {
+        val b = makeBattery(voltageV = -1f, currentMa = 1000)
+        assertEquals(Int.MIN_VALUE, b.powerMw)
+    }
+
+    @Test fun powerMw_zeroCurrent() {
+        val b = makeBattery(voltageV = 3.9f, currentMa = 0)
+        assertEquals(0, b.powerMw)
+    }
 }

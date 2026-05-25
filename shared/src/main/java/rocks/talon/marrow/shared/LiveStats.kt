@@ -36,6 +36,27 @@ object LiveStats {
         val healthPercent: Int = -1,      // 0..100, -1 unknown
     ) {
         enum class PlugType { UNPLUGGED, AC, USB, WIRELESS, DOCK }
+
+        /**
+         * Instantaneous power draw in milliwatts.
+         *
+         * Positive = net input to the battery (charging path active).
+         * Negative = net draw from the battery (discharging / screen on).
+         *
+         * Sign follows [currentMa]: on most OEMs (Qualcomm/Google Tensor)
+         * [BatteryManager.BATTERY_PROPERTY_CURRENT_NOW] is signed in µA —
+         * positive when charging current is flowing into the cell, negative
+         * when load current flows out. A small minority of OEMs report the
+         * absolute value regardless of direction; on those devices the sign
+         * will be wrong (always positive), but the magnitude is still useful.
+         *
+         * Returns [Int.MIN_VALUE] when either [currentMa] or [voltageV] is
+         * unavailable (i.e., [currentMa] == [Int.MIN_VALUE] or [voltageV] < 0).
+         */
+        val powerMw: Int
+            get() = if (currentMa != Int.MIN_VALUE && voltageV >= 0f)
+                (voltageV * currentMa.toFloat()).roundToInt()
+            else Int.MIN_VALUE
     }
 
     fun battery(context: Context): Battery {
