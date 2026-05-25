@@ -165,6 +165,23 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                     }
                     BigStat("Health", "$healthPct%", valueColor = healthColor)
                 }
+                val powerMw = battery?.powerMw ?: Int.MIN_VALUE
+                if (!isWatch && powerMw != Int.MIN_VALUE) {
+                    Spacer(Modifier.height(8.dp))
+                    val powerW = powerMw / 1000f
+                    val sign = if (powerW >= 0f) "+" else ""
+                    val powerColor = when {
+                        powerW > 10f  -> MaterialTheme.colorScheme.primary    // fast charge (10W+)
+                        powerW > 0f   -> MaterialTheme.colorScheme.secondary  // slow / trickle charge
+                        powerW < -4f  -> MaterialTheme.colorScheme.error      // high screen-on drain
+                        else          -> MaterialTheme.colorScheme.onSurface
+                    }
+                    BigStat(
+                        label = "Power",
+                        value = "${sign}%.1f W".format(powerW),
+                        valueColor = powerColor,
+                    )
+                }
             }
         }
     }
