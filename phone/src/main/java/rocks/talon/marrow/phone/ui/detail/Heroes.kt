@@ -155,6 +155,16 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                     Spacer(Modifier.height(8.dp))
                     BigStat("Current", "$curMa mA")
                 }
+                val healthPct = battery?.healthPercent ?: -1
+                if (!isWatch && healthPct >= 0) {
+                    Spacer(Modifier.height(8.dp))
+                    val healthColor = when {
+                        healthPct >= 85 -> Color(0xFF66BB6A)
+                        healthPct >= 75 -> Color(0xFFFFA726)
+                        else            -> Color(0xFFE53935)
+                    }
+                    BigStat("Health", "$healthPct%", valueColor = healthColor)
+                }
             }
         }
     }
@@ -1111,10 +1121,18 @@ private fun HeroBox(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun BigStat(label: String, value: String) {
+private fun BigStat(
+    label: String,
+    value: String,
+    valueColor: Color? = null,
+) {
     Column {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold))
+        Text(
+            value,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = valueColor ?: MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
