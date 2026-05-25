@@ -340,6 +340,13 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
 private fun CoreBar(core: LiveStats.CpuCore) {
     val frac = if (core.maxMhz > 0) (core.curMhz.toFloat() / core.maxMhz.toFloat()).coerceIn(0f, 1f) else 0f
     val animated by animateFloatAsState(targetValue = frac, animationSpec = tween(450), label = "core-${core.index}")
+    // Colour mirrors ThermalZoneRow thresholds: red when near/at max (≥ 85%), orange when
+    // elevated (≥ 65%), primary colour when idle/low. Makes throttled cores visually obvious.
+    val freqColor = when {
+        frac >= 0.85f -> Color(0xFFE53935)              // red   — pegged / near max
+        frac >= 0.65f -> Color(0xFFFFA726)              // orange — elevated
+        else -> MaterialTheme.colorScheme.primary       // normal — idle / low frequency
+    }
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -361,7 +368,7 @@ private fun CoreBar(core: LiveStats.CpuCore) {
                 modifier = Modifier
                     .fillMaxWidth(animated)
                     .height(10.dp)
-                    .background(MaterialTheme.colorScheme.primary),
+                    .background(freqColor),
             )
         }
         Spacer(Modifier.width(8.dp))
@@ -377,6 +384,11 @@ private fun CoreBar(core: LiveStats.CpuCore) {
 @Composable
 private fun CoreBarStatic(label: String, current: Long, max: Long) {
     val frac = if (max > 0) (current.toFloat() / max.toFloat()).coerceIn(0f, 1f) else 0f
+    val freqColor = when {
+        frac >= 0.85f -> Color(0xFFE53935)
+        frac >= 0.65f -> Color(0xFFFFA726)
+        else -> MaterialTheme.colorScheme.primary
+    }
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -389,7 +401,7 @@ private fun CoreBarStatic(label: String, current: Long, max: Long) {
                 .clip(RoundedCornerShape(6.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
-            Box(modifier = Modifier.fillMaxWidth(frac).height(10.dp).background(MaterialTheme.colorScheme.primary))
+            Box(modifier = Modifier.fillMaxWidth(frac).height(10.dp).background(freqColor))
         }
         Spacer(Modifier.width(8.dp))
         Text("$current", style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(64.dp))
