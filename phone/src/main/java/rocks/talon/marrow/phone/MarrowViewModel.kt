@@ -123,6 +123,9 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _screenBrightnessAuto = MutableStateFlow<Boolean?>(null)
     val screenBrightnessAuto: StateFlow<Boolean?> = _screenBrightnessAuto.asStateFlow()
 
+    private val _batterySaverActive = MutableStateFlow<Boolean?>(null)
+    val batterySaverActive: StateFlow<Boolean?> = _batterySaverActive.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -221,6 +224,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _screenBrightnessPct.value = LiveStats.screenBrightnessPercent(ctx)
                 // Adaptive brightness mode — Settings.System.SCREEN_BRIGHTNESS_MODE, no permissions needed
                 _screenBrightnessAuto.value = LiveStats.screenBrightnessAuto(ctx)
+                // Battery saver mode — PowerManager.isPowerSaveMode(), no permissions needed
+                _batterySaverActive.value = LiveStats.batterySaverActive(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }
