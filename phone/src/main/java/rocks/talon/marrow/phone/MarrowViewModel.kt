@@ -107,6 +107,10 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _gpu = MutableStateFlow<LiveStats.Gpu?>(null)
     val gpu: StateFlow<LiveStats.Gpu?> = _gpu.asStateFlow()
 
+    /** Live Wi-Fi RSSI in dBm. null when not connected to Wi-Fi or unavailable. */
+    private val _wifiRssiDbm = MutableStateFlow<Int?>(null)
+    val wifiRssiDbm: StateFlow<Int?> = _wifiRssiDbm.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -195,6 +199,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _thermalZones.value = LiveStats.thermalZones()
                 // GPU — frequency, utilisation, governor (kgsl or generic devfreq)
                 _gpu.value = LiveStats.gpu()
+                // Wi-Fi RSSI — live signal strength in dBm (null when not on Wi-Fi)
+                _wifiRssiDbm.value = LiveStats.wifiRssi(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }

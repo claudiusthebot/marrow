@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Environment
 import android.os.StatFs
@@ -593,6 +594,26 @@ object LiveStats {
             hours > 0             -> "${hours}h"
             else                  -> "${mins}m"
         }
+    }
+
+    // -- Wi-Fi signal strength --------------------------------------------------
+
+    /**
+     * Live Wi-Fi signal strength in dBm, or null when not connected.
+     *
+     * Reads [WifiManager.connectionInfo.rssi] via ACCESS_WIFI_STATE (already held
+     * by Marrow). Returns null when not connected, WifiManager unavailable, or
+     * RSSI is outside the valid range. [WifiManager.getConnectionInfo] is
+     * deprecated on API 31+ but still functional for RSSI reads without
+     * ACCESS_FINE_LOCATION. Suppressing is intentional.
+     */
+    @Suppress("DEPRECATION")
+    fun wifiRssi(context: Context): Int? {
+        val wm = context.applicationContext
+            .getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return null
+        val rssi = wm.connectionInfo?.rssi ?: return null
+        // Valid RSSI: negative and >= -120 dBm; 0 = disconnected sentinel.
+        return if (rssi < 0 && rssi >= -120) rssi else null
     }
 
     // -- helpers -----------------------------------------------------------------
