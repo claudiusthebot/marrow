@@ -73,6 +73,7 @@ fun DeviceTab(
     val uptimeSeconds by vm.systemUptimeSeconds.collectAsState()
     val gpu by vm.gpu.collectAsState()
     val networkRate by vm.networkRate.collectAsState()
+    val diskRate by vm.diskRate.collectAsState()
 
     val cpuAvg = remember(cpuCores) { LiveStats.avgCurMhz(cpuCores) }
     val cpuUsagePercent by vm.cpuUsagePercent.collectAsState()
@@ -129,6 +130,7 @@ fun DeviceTab(
                     storageUsedFraction = storageFrac,
                     gpu = gpu,
                     networkRate = networkRate,
+                    diskRate = diskRate,
                     onChipClick = onSection,
                 )
             }
