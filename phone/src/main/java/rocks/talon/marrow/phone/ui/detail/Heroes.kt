@@ -883,6 +883,7 @@ private fun VolumeRow(vol: LiveStats.Volume) {
 @Composable
 fun DisplayHero(vm: MarrowViewModel, section: Section) {
     val screenBrightnessPct by vm.screenBrightnessPct.collectAsState()
+    val screenBrightnessAuto by vm.screenBrightnessAuto.collectAsState()
     val res = section.rows.firstOrNull { it.label == "Resolution" }?.value ?: "—"
     val dpi = section.rows.firstOrNull { it.label == "Density" }?.value ?: "—"
     val refresh = section.rows.firstOrNull { it.label == "Refresh rate" }?.value ?: "—"
@@ -932,9 +933,14 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
                 )
             }
             val brt = screenBrightnessPct
+            val autoMode = screenBrightnessAuto
             if (brt != null) {
                 Spacer(Modifier.height(8.dp))
                 BigStat("Brightness", "$brt%")
+                if (autoMode != null) {
+                    Spacer(Modifier.height(4.dp))
+                    BigStat("Br. Mode", if (autoMode) "Auto" else "Manual")
+                }
             }
         }
     }
