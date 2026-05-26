@@ -42,6 +42,11 @@ import rocks.talon.marrow.shared.LiveStats
  * Wear tile. Always present so the strip layout is stable — shows "—" until the
  * second live-loop tick produces a rate delta. Tapping navigates to the Network
  * section for per-interface detail.
+ *
+ * Disk tile (v0.19.0): conditional — only shown when /proc/diskstats reports
+ * active I/O (read + write > 0). Hides at rest so the strip stays compact.
+ * Displays total throughput (read + write) in the same format as LiveStats.
+ * Tapping navigates to the Storage section.
  */
 @Composable
 fun LiveStatsStrip(
@@ -52,6 +57,7 @@ fun LiveStatsStrip(
     storageUsedFraction: Float,
     gpu: LiveStats.Gpu?,
     networkRate: Pair<Long, Long> = 0L to 0L,
+    diskRate: Pair<Long, Long> = 0L to 0L,
     onChipClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -102,6 +108,17 @@ fun LiveStatsStrip(
             onClick = { onChipClick("network") },
             modifier = Modifier.weight(1f),
         )
+        // Disk tile — conditional. Only rendered when /proc/diskstats reports
+        // active I/O. Hides at rest so the strip stays compact when idle.
+        val diskTotal = diskRate.first + diskRate.second
+        if (diskTotal > 0L) {
+            AnimatedTile(
+                label = "Disk",
+                value = LiveStats.formatDiskBps(diskTotal),
+                onClick = { onChipClick("storage") },
+                modifier = Modifier.weight(1f),
+            )
+        }
         // GPU tile — only rendered when the driver exposes at least one
         // readable frequency stat (gpu.available = maxMhz > 0). On emulators
         // and SELinux-locked devices the tile is absent rather than showing "—".
