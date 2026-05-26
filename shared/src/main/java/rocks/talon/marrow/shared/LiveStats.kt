@@ -706,6 +706,16 @@ object LiveStats {
         null
     }
 
+
+    /**
+     * Returns whether battery saver (low-power) mode is currently active,
+     * null when [PowerManager] is unavailable. No special permissions required.
+     */
+    fun batterySaverActive(context: Context): Boolean? = runCatching {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+        pm?.isPowerSaveMode
+    }.getOrNull()
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =

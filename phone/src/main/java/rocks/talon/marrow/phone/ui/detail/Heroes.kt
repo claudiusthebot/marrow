@@ -54,6 +54,7 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val battery by vm.battery.collectAsState()
     val uptimeSeconds by vm.systemUptimeSeconds.collectAsState()
     val chargeEtaMs by vm.chargeTimeRemainingMs.collectAsState()
+    val batterySaverActive by vm.batterySaverActive.collectAsState()
     val percent = if (isWatch) {
         // For the watch, parse the battery section's "Level" row (already a string %)
         section.rows.firstOrNull { it.label == "Level" }?.value
@@ -196,6 +197,11 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                 if (!isWatch && charging && chargeEtaMs > 0L) {
                     Spacer(Modifier.height(8.dp))
                     BigStat("Charge ETA", LiveStats.formatChargeEta(chargeEtaMs))
+                }
+                val saverActive = batterySaverActive
+                if (!isWatch && saverActive != null) {
+                    Spacer(Modifier.height(8.dp))
+                    BigStat("Saver", if (saverActive) "On" else "Off")
                 }
             }
         }
