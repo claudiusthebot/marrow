@@ -936,6 +936,7 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
     val networkRatePair by vm.networkRate.collectAsState()
     val (rxBps, txBps) = networkRatePair
     val wifiRssiDbm by vm.wifiRssiDbm.collectAsState()
+    val wifiLinkSpeedMbps by vm.wifiLinkSpeedMbps.collectAsState()
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -961,6 +962,11 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
                     else            -> MaterialTheme.colorScheme.error
                 }
                 BigStat("Wi-Fi Signal", "$liveRssi dBm", valueColor = rssiColor)
+            }
+            val liveSpeed = wifiLinkSpeedMbps
+            if (liveSpeed != null) {
+                Spacer(Modifier.height(8.dp))
+                BigStat("Link Speed", "$liveSpeed Mbps")
             }
             // Live throughput — shown after the first two polling ticks provide a rate
             if (rxBps > 0L || txBps > 0L) {

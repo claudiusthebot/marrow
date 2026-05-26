@@ -616,6 +616,22 @@ object LiveStats {
         return if (rssi < 0 && rssi >= -120) rssi else null
     }
 
+
+    /**
+     * Current Wi-Fi link speed in Mbps, or null when not connected to Wi-Fi.
+     *
+     * Uses the same deprecated-but-functional [WifiManager.getConnectionInfo] path as
+     * [wifiRssi]. [WifiManager.LINK_SPEED_UNKNOWN] (-1) is returned when the device is
+     * not associated; any non-positive value is treated as unavailable.
+     */
+    @Suppress("DEPRECATION")
+    fun wifiLinkSpeedMbps(context: Context): Int? {
+        val wm = context.applicationContext
+            .getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return null
+        val speed = wm.connectionInfo?.linkSpeed ?: return null
+        return if (speed > 0) speed else null
+    }
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =
