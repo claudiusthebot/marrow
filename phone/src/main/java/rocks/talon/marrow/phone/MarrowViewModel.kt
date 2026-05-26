@@ -117,6 +117,10 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _chargeTimeRemainingMs = MutableStateFlow(-1L)
     val chargeTimeRemainingMs: StateFlow<Long> = _chargeTimeRemainingMs.asStateFlow()
 
+    /** Live screen brightness as a percentage (0–100). null when the settings read fails. */
+    private val _screenBrightnessPct = MutableStateFlow<Int?>(null)
+    val screenBrightnessPct: StateFlow<Int?> = _screenBrightnessPct.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -211,6 +215,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _wifiLinkSpeedMbps.value = LiveStats.wifiLinkSpeedMbps(ctx)
                 // Charge time remaining — BatteryManager estimate, -1L when discharging or unavailable
                 _chargeTimeRemainingMs.value = LiveStats.chargeTimeRemainingMs(ctx)
+                // Screen brightness — Settings.System.SCREEN_BRIGHTNESS, no permissions needed
+                _screenBrightnessPct.value = LiveStats.screenBrightnessPercent(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }

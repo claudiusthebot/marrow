@@ -881,7 +881,8 @@ private fun VolumeRow(vol: LiveStats.Volume) {
 // -- Display -----------------------------------------------------------------
 
 @Composable
-fun DisplayHero(section: Section) {
+fun DisplayHero(vm: MarrowViewModel, section: Section) {
+    val screenBrightnessPct by vm.screenBrightnessPct.collectAsState()
     val res = section.rows.firstOrNull { it.label == "Resolution" }?.value ?: "—"
     val dpi = section.rows.firstOrNull { it.label == "Density" }?.value ?: "—"
     val refresh = section.rows.firstOrNull { it.label == "Refresh rate" }?.value ?: "—"
@@ -929,6 +930,11 @@ fun DisplayHero(section: Section) {
                         labelColor = MaterialTheme.colorScheme.onTertiaryContainer,
                     ),
                 )
+            }
+            val brt = screenBrightnessPct
+            if (brt != null) {
+                Spacer(Modifier.height(8.dp))
+                BigStat("Brightness", "$brt%")
             }
         }
     }

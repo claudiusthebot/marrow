@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.wifi.WifiManager
+import android.provider.Settings
 import android.os.BatteryManager
 import android.os.Environment
 import android.os.StatFs
@@ -666,6 +667,27 @@ object LiveStats {
             mins > 0L               -> "${mins}m"
             else                    -> "<1m"
         }
+    }
+
+
+    // -- Screen brightness -------------------------------------------------------
+
+    /**
+     * Current screen brightness as a percentage (0–100).
+     *
+     * Reads [Settings.System.SCREEN_BRIGHTNESS] (raw 0–255 integer). Responds to
+     * adaptive brightness changes in real time — [SCREEN_BRIGHTNESS] tracks the actual
+     * hardware backlight level even when automatic mode is active.
+     *
+     * No special permissions required; [Settings.System] is always readable by
+     * standard apps. Returns null when the key is absent (should not occur on
+     * standard Android).
+     */
+    fun screenBrightnessPercent(context: Context): Int? = try {
+        val raw = Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS)
+        (raw * 100 / 255).coerceIn(0, 100)
+    } catch (_: Settings.SettingNotFoundException) {
+        null
     }
 
     // -- helpers -----------------------------------------------------------------
