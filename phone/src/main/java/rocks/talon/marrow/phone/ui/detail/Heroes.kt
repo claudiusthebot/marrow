@@ -932,10 +932,10 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
     val transport = section.rows.firstOrNull { it.label == "Connection" }?.value ?: "—"
     val carrier = section.rows.firstOrNull { it.label == "Carrier" }?.value
     val ssid = section.rows.firstOrNull { it.label == "Wi-Fi SSID" }?.value
-    val rssi = section.rows.firstOrNull { it.label == "Wi-Fi RSSI" }?.value
     // val (a, b) by delegate is not valid Kotlin syntax — split into two lines.
     val networkRatePair by vm.networkRate.collectAsState()
     val (rxBps, txBps) = networkRatePair
+    val wifiRssiDbm by vm.wifiRssiDbm.collectAsState()
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -951,9 +951,16 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
                     )
                 }
             }
-            if (rssi != null) {
+            val liveRssi = wifiRssiDbm
+            if (liveRssi != null) {
                 Spacer(Modifier.height(8.dp))
-                AssistChip(onClick = {}, label = { Text("RSSI $rssi") })
+                val rssiColor = when {
+                    liveRssi >= -50 -> MaterialTheme.colorScheme.primary
+                    liveRssi >= -65 -> MaterialTheme.colorScheme.secondary
+                    liveRssi >= -80 -> MaterialTheme.colorScheme.onSurface
+                    else            -> MaterialTheme.colorScheme.error
+                }
+                BigStat("Wi-Fi Signal", "$liveRssi dBm", valueColor = rssiColor)
             }
             // Live throughput — shown after the first two polling ticks provide a rate
             if (rxBps > 0L || txBps > 0L) {
