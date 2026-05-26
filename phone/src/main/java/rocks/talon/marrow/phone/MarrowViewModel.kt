@@ -110,6 +110,9 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     /** Live Wi-Fi RSSI in dBm. null when not connected to Wi-Fi or unavailable. */
     private val _wifiRssiDbm = MutableStateFlow<Int?>(null)
     val wifiRssiDbm: StateFlow<Int?> = _wifiRssiDbm.asStateFlow()
+    /** Live Wi-Fi link speed in Mbps. null when not connected to Wi-Fi or unavailable. */
+    private val _wifiLinkSpeedMbps = MutableStateFlow<Int?>(null)
+    val wifiLinkSpeedMbps: StateFlow<Int?> = _wifiLinkSpeedMbps.asStateFlow()
 
     // -- Settings ----------------------------------------------------------------
 
@@ -201,6 +204,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _gpu.value = LiveStats.gpu()
                 // Wi-Fi RSSI — live signal strength in dBm (null when not on Wi-Fi)
                 _wifiRssiDbm.value = LiveStats.wifiRssi(ctx)
+                // Wi-Fi link speed — negotiated data rate in Mbps (null when not on Wi-Fi)
+                _wifiLinkSpeedMbps.value = LiveStats.wifiLinkSpeedMbps(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }
