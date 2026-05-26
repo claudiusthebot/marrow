@@ -184,6 +184,11 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                         valueColor = powerColor,
                     )
                 }
+                val cycleCnt = battery?.cycleCount ?: -1
+                if (!isWatch && cycleCnt > 0) {
+                    Spacer(Modifier.height(8.dp))
+                    BigStat("Cycles", "$cycleCnt")
+                }
                 if (!isWatch && uptimeSeconds > 0L) {
                     Spacer(Modifier.height(8.dp))
                     BigStat("Uptime", LiveStats.formatUptime(uptimeSeconds))

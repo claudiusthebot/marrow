@@ -35,6 +35,8 @@ object LiveStats {
         /** Battery wear level: charge_full / charge_full_design × 100.
          *  -1 when the sysfs nodes are absent or unreadable (emulator / OEM restriction). */
         val healthPercent: Int = -1,      // 0..100, -1 unknown
+        /** Charge cycle count from sysfs. -1 when absent (emulator / OEM restriction). */
+        val cycleCount: Int = -1,          // ≥0, -1 unknown
     ) {
         enum class PlugType { UNPLUGGED, AC, USB, WIRELESS, DOCK }
 
@@ -96,6 +98,8 @@ object LiveStats {
             technology = tech,
             healthy = healthInt == BatteryManager.BATTERY_HEALTH_GOOD || healthInt == -1,
             healthPercent = healthPct,
+            cycleCount = readLong("/sys/class/power_supply/battery/cycle_count")
+                .let { if (it > 0L) it.toInt() else -1 },
         )
     }
 
