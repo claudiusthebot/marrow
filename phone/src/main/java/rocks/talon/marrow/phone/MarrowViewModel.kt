@@ -120,6 +120,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     /** Live screen brightness as a percentage (0–100). null when the settings read fails. */
     private val _screenBrightnessPct = MutableStateFlow<Int?>(null)
     val screenBrightnessPct: StateFlow<Int?> = _screenBrightnessPct.asStateFlow()
+    private val _screenBrightnessAuto = MutableStateFlow<Boolean?>(null)
+    val screenBrightnessAuto: StateFlow<Boolean?> = _screenBrightnessAuto.asStateFlow()
 
     // -- Settings ----------------------------------------------------------------
 
@@ -217,6 +219,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _chargeTimeRemainingMs.value = LiveStats.chargeTimeRemainingMs(ctx)
                 // Screen brightness — Settings.System.SCREEN_BRIGHTNESS, no permissions needed
                 _screenBrightnessPct.value = LiveStats.screenBrightnessPercent(ctx)
+                // Adaptive brightness mode — Settings.System.SCREEN_BRIGHTNESS_MODE, no permissions needed
+                _screenBrightnessAuto.value = LiveStats.screenBrightnessAuto(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }

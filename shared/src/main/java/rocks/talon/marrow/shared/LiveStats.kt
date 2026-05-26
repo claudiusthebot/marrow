@@ -690,6 +690,22 @@ object LiveStats {
         null
     }
 
+    /**
+     * Whether adaptive (automatic) brightness is currently enabled.
+     *
+     * Reads [Settings.System.SCREEN_BRIGHTNESS_MODE]. Returns true when automatic,
+     * false when manual, null when the key is absent (should not occur on
+     * standard Android). No special permissions required.
+     */
+    fun screenBrightnessAuto(context: Context): Boolean? = try {
+        Settings.System.getInt(
+            context.contentResolver,
+            Settings.System.SCREEN_BRIGHTNESS_MODE,
+        ) == Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
+    } catch (_: Settings.SettingNotFoundException) {
+        null
+    }
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =
