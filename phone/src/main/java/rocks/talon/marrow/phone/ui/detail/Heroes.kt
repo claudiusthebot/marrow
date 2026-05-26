@@ -52,6 +52,7 @@ private val HERO_RADIUS = RoundedCornerShape(32.dp)
 @Composable
 fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val battery by vm.battery.collectAsState()
+    val uptimeSeconds by vm.systemUptimeSeconds.collectAsState()
     val percent = if (isWatch) {
         // For the watch, parse the battery section's "Level" row (already a string %)
         section.rows.firstOrNull { it.label == "Level" }?.value
@@ -181,6 +182,10 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                         value = "${sign}%.1f W".format(powerW),
                         valueColor = powerColor,
                     )
+                }
+                if (!isWatch && uptimeSeconds > 0L) {
+                    Spacer(Modifier.height(8.dp))
+                    BigStat("Uptime", LiveStats.formatUptime(uptimeSeconds))
                 }
             }
         }
