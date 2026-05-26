@@ -113,6 +113,9 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     /** Live Wi-Fi link speed in Mbps. null when not connected to Wi-Fi or unavailable. */
     private val _wifiLinkSpeedMbps = MutableStateFlow<Int?>(null)
     val wifiLinkSpeedMbps: StateFlow<Int?> = _wifiLinkSpeedMbps.asStateFlow()
+    /** Estimated time to full charge in milliseconds. -1L when discharging or unavailable. */
+    private val _chargeTimeRemainingMs = MutableStateFlow(-1L)
+    val chargeTimeRemainingMs: StateFlow<Long> = _chargeTimeRemainingMs.asStateFlow()
 
     // -- Settings ----------------------------------------------------------------
 
@@ -206,6 +209,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _wifiRssiDbm.value = LiveStats.wifiRssi(ctx)
                 // Wi-Fi link speed — negotiated data rate in Mbps (null when not on Wi-Fi)
                 _wifiLinkSpeedMbps.value = LiveStats.wifiLinkSpeedMbps(ctx)
+                // Charge time remaining — BatteryManager estimate, -1L when discharging or unavailable
+                _chargeTimeRemainingMs.value = LiveStats.chargeTimeRemainingMs(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }

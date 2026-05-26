@@ -632,6 +632,38 @@ object LiveStats {
         return if (speed > 0) speed else null
     }
 
+    // -- Charge time remaining --------------------------------------------------
+
+    /**
+     * Estimated time remaining until the battery is fully charged, in milliseconds.
+     *
+     * Uses [BatteryManager.computeChargeTimeRemaining] (API 21+, always available
+     * since Marrow's minSdk is 30). Returns -1L when the device is not charging,
+     * the estimate is unavailable, or BatteryManager cannot be obtained.
+     */
+    fun chargeTimeRemainingMs(context: Context): Long {
+        val mgr = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager ?: return -1L
+        return mgr.computeChargeTimeRemaining()
+    }
+
+    /**
+     * Formats a charge time remaining in milliseconds as a concise human-readable string.
+     *
+     * Examples: 3_960_000ms (66 min) → "1h 6m", 2_700_000ms (45 min) → "45m", ≤ 0 → "—"
+     */
+    fun formatChargeEta(ms: Long): String {
+        if (ms <= 0L) return "—"
+        val totalSeconds = ms / 1000L
+        val hours = totalSeconds / 3_600L
+        val mins = (totalSeconds % 3_600L) / 60L
+        return when {
+            hours > 0L && mins > 0L -> "${hours}h ${mins}m"
+            hours > 0L              -> "${hours}h"
+            mins > 0L               -> "${mins}m"
+            else                    -> "<1m"
+        }
+    }
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =
