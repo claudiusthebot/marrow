@@ -1,6 +1,11 @@
 package rocks.talon.marrow.wear
 
 import android.app.Application
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.wearable.Wearable
@@ -21,6 +26,13 @@ import rocks.talon.marrow.wear.sync.pingPhone
 /**
  * Holds the shared device-info snapshot for every screen in the watch app and
  * the small ping-phone state machine.
+ *
+ * v0.15.0 additions:
+ * - Step counter via SensorEventListener on TYPE_STEP_COUNTER, registered in
+ *   [initStepCounter] (called from [init]) and unregistered in [onCleared].
+ *   Exposed as [stepCount] StateFlow. Mirrors the tile-side implementation
+ *   in StatsTileService. Zero new permissions — TYPE_STEP_COUNTER is available
+ *   without ACTIVITY_RECOGNITION on API 29+.
  *
  * v0.2.0 additions:
  * - Live battery/memory polling while the screen is on (driven by detail
@@ -58,11 +70,48 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val _gpu = MutableStateFlow<LiveStats.Gpu?>(null)
     val gpu: StateFlow<LiveStats.Gpu?> = _gpu.asStateFlow()
 
+    /**
+     * Cumulative step count since last device reboot via TYPE_STEP_COUNTER.
+     * null until the first sensor event fires (typically < 1 s on hardware that
+     * has a step-counter pedometer; stays null on emulators and watches without
+     * the sensor).
+     *
+     * Updated on the main thread by [stepListener]; safe to collect from
+     * Compose.
+     */
+    private val _stepCount = MutableStateFlow<Long?>(null)
+    val stepCount: StateFlow<Long?> = _stepCount.asStateFlow()
+
+    /** Retained so we can unregister in [onCleared]. */
+    private var stepSensorManager: SensorManager? = null
+
+    private val stepListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            if (event.sensor.type == Sensor.TYPE_STEP_COUNTER) {
+                _stepCount.value = event.values[0].toLong()
+            }
+        }
+        override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
+    }
+
     private var liveJob: Job? = null
 
     init {
         refresh()
         checkPhoneReachable()
+        initStepCounter()
+    }
+
+    /**
+     * Register a TYPE_STEP_COUNTER SensorEventListener. Idempotent — silently
+     * no-ops on devices without a pedometer sensor.
+     */
+    private fun initStepCounter() {
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        stepSensorManager = sm
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) ?: return
+        sm.registerListener(stepListener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
     fun refresh() {
@@ -123,6 +172,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         liveJob?.cancel()
+        stepSensorManager?.unregisterListener(stepListener)
         super.onCleared()
     }
 
