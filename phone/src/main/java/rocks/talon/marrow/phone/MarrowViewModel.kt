@@ -154,6 +154,21 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _ambientTempC = MutableStateFlow<Float?>(null)
     val ambientTempC: StateFlow<Float?> = _ambientTempC.asStateFlow()
 
+    /**
+     * Steps accumulated since the last device reboot from [Sensor.TYPE_STEP_COUNTER].
+     * null before the first event fires or on devices without a hardware step counter.
+     *
+     * **Accumulator semantics:** the counter monotonically increases from an arbitrary
+     * baseline (typically the total steps since boot, reset to 0 on reboot). It is NOT
+     * a daily step count. On most flagships (Pixel, Samsung) the counter survives the
+     * app process being killed and restarted — it reflects real hardware odometer state.
+     *
+     * Zero permissions required — [Sensor.TYPE_STEP_COUNTER] is readable by any app
+     * targeting API 29+. Silent no-op on devices without a hardware pedometer.
+     */
+    private val _stepCount = MutableStateFlow<Long?>(null)
+    val stepCount: StateFlow<Long?> = _stepCount.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -165,6 +180,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private var lightSensorListener: SensorEventListener? = null
     private var pressureSensorListener: SensorEventListener? = null
     private var ambientTempSensorListener: SensorEventListener? = null
+    private var stepCounterListener: SensorEventListener? = null
 
     init {
         refreshPhone()
@@ -173,6 +189,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         startLightSensor()
         startPressureSensor()
         startAmbientTempSensor()
+        startStepCounterSensor()
     }
 
     // -- Operations --------------------------------------------------------------
@@ -345,6 +362,33 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
+    /**
+     * Registers a [SensorEventListener] for [Sensor.TYPE_STEP_COUNTER] using
+     * [SensorManager.SENSOR_DELAY_NORMAL] (~200ms). The step counter is a hardware
+     * accumulator — it fires events with the running total of steps since the last
+     * device reboot. Unlike level sensors (lux, hPa, °C), its value is a monotonically
+     * increasing [Long], so [_stepCount] stores the raw counter value directly.
+     *
+     * The listener writes [_stepCount] from the hardware callback thread; [MutableStateFlow]
+     * is thread-safe so no coroutine dispatch is needed.
+     *
+     * Zero permissions required. Silent no-op on devices without a hardware step counter.
+     */
+    private fun startStepCounterSensor() {
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) ?: return
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                val steps = event?.values?.firstOrNull() ?: return
+                _stepCount.value = steps.toLong()
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        stepCounterListener = listener
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
     override fun onCleared() {
         liveJob?.cancel()
         lightSensorListener?.let { sensorManager?.unregisterListener(it) }
@@ -352,6 +396,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
             .getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         pressureSensorListener?.let { sm?.unregisterListener(it) }
         ambientTempSensorListener?.let { sm?.unregisterListener(it) }
+        stepCounterListener?.let { sm?.unregisterListener(it) }
         super.onCleared()
     }
 }

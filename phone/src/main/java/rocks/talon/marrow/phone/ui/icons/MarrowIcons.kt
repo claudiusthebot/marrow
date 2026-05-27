@@ -240,6 +240,25 @@ object MarrowIcons {
             .stroke("M14 10 V14")
     }
 
+    /**
+     * Activity: a stylised walking person — circle head + body stride.
+     * Represents motion/fitness/step-counter data.
+     */
+    val Activity: ImageVector = marrow("Activity") {
+        // Head
+        stroke("M12 3 a2 2 0 1 0 0 4 a2 2 0 1 0 0 -4 Z", fill = Color.Black)
+            // Torso
+            .stroke("M12 9 L10 14")
+            // Left leg (stride forward)
+            .stroke("M10 14 L8 20")
+            // Right leg (stride back)
+            .stroke("M10 14 L13 19")
+            // Left arm (swing forward)
+            .stroke("M12 10 L9 13")
+            // Right arm (swing back)
+            .stroke("M12 10 L15 12")
+    }
+
     /** Brand mark — small "M" tilted, used in the wordmark. */
     val Wordmark: ImageVector = marrow("Wordmark") {
         stroke("M4 19 V5 L12 13 L20 5 V19", width = 2.25f)
@@ -268,6 +287,7 @@ object MarrowIcons {
         Sections.BUILD_FLAGS -> BuildFlags
         Sections.SOFTWARE -> Software
         Sections.GPU -> Gpu
+        Sections.ACTIVITY -> Activity
         else -> Device
     }
 }

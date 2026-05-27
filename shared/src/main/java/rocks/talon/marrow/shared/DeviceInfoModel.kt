@@ -47,6 +47,8 @@ object Sections {
     const val BUILD_FLAGS = "build_flags"
     const val SOFTWARE = "software"
     const val GPU = "gpu"
+    /** Phone-only activity section: step counter and future motion/fitness stats. */
+    const val ACTIVITY = "activity"
 }
 
 object MarrowPaths {
