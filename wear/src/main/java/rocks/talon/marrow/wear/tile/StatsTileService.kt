@@ -2,6 +2,10 @@ package rocks.talon.marrow.wear.tile
 
 import android.app.NotificationManager
 import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.wear.protolayout.ActionBuilders
@@ -42,9 +46,9 @@ import rocks.talon.marrow.wear.R
 
 /**
  * Wear OS tile that surfaces Marrow's headline live stats as a 2×2 grid of
- * coloured pills plus a compact footer row beneath them.
+ * coloured pills, a step-count row, and a compact footer row beneath them.
  *
- * Layout (v0.12.0):
+ * Layout (v0.14.0):
  * ```
  *        MARROW  42°↑
  *  ┌──────────┐ ┌──────────┐
@@ -55,6 +59,7 @@ import rocks.talon.marrow.wear.R
  *  │  18%     │ │   2%     │
  *  │  CPU     │ │  GPU     │
  *  └──────────┘ └──────────┘
+ *          12,345 steps
  *      ↓ 1.2M  ↑ 345K  · 42°
  * ```
  *
@@ -76,6 +81,12 @@ import rocks.talon.marrow.wear.R
  * one valid thermal reading has been collected since the tile service started.
  * This lets the user spot "my phone hit 87°C at some point today" even if the
  * current temperature has since dropped.
+ *
+ * The step-count row shows cumulative steps since last reboot via
+ * [Sensor.TYPE_STEP_COUNTER], registered in [onCreate] and unregistered in
+ * [onDestroy]. Shows "—" until the first sensor event is delivered (typically
+ * < 1 s after the service starts). Silently absent on hardware without a
+ * step-counter pedometer. Zero additional permissions required.
  *
  * The footer row shows three live signals:
  *  - receive throughput (↓) and transmit throughput (↑) — sampled across the
@@ -128,6 +139,30 @@ class StatsTileService : TileService() {
     private var lastAlertMs: Long = 0L
 
     /**
+     * Cumulative step count since last device reboot, or null when no sensor
+     * event has been received yet. Updated by [stepListener] on the main thread;
+     * read on the tile-request thread — annotated @Volatile for visibility.
+     */
+    @Volatile private var stepCount: Long? = null
+
+    /** SensorManager retained so we can unregister in [onDestroy]. */
+    private var sensorManager: SensorManager? = null
+
+    /**
+     * SensorEventListener for [Sensor.TYPE_STEP_COUNTER].
+     * Registered in [onCreate], unregistered in [onDestroy].
+     * Callbacks are delivered on the main thread (default Looper).
+     */
+    private val stepListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            if (event.sensor.type == Sensor.TYPE_STEP_COUNTER) {
+                stepCount = event.values[0].toLong()
+            }
+        }
+        override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
+    }
+
+    /**
      * Container for all metrics that require either a delta window or a
      * sysfs read taken at request time.
      *
@@ -144,6 +179,19 @@ class StatsTileService : TileService() {
         /** CPU/SoC thermal temperature in °C, or -1f when sysfs is unreadable. */
         val tempC: Float,
     )
+
+    override fun onCreate() {
+        super.onCreate()
+        val sm = getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        sensorManager = sm
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) ?: return
+        sm.registerListener(stepListener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
+    override fun onDestroy() {
+        sensorManager?.unregisterListener(stepListener)
+        super.onDestroy()
+    }
 
     override fun onTileRequest(
         requestParams: TileRequest,
@@ -188,6 +236,7 @@ class StatsTileService : TileService() {
             txBps = dynamic.txBps,
             tempC = dynamic.tempC,
             peakTempC = peakTempC,
+            stepCount = stepCount,
         )
 
         val tile = Tile.Builder()
@@ -247,6 +296,7 @@ class StatsTileService : TileService() {
         txBps: Long,
         tempC: Float,
         peakTempC: Float,
+        stepCount: Long?,
     ): LayoutElement {
         val launchAction = ActionBuilders.LaunchAction.Builder()
             .setAndroidActivity(
@@ -308,6 +358,8 @@ class StatsTileService : TileService() {
                             rightColor = StatsTilePalette.colorForLoad(gpuPct),
                         ),
                     )
+                    .addContent(spacer(SPACING_STEPS))
+                    .addContent(stepsRow(stepCount))
                     .addContent(spacer(SPACING_NET))
                     .addContent(networkRow(rxBps, txBps, tempC))
                     .build(),
@@ -348,6 +400,32 @@ class StatsTileService : TileService() {
             .addContent(cell(leftLabel, leftValue, leftColor))
             .addContent(spacer(SPACING_CELL))
             .addContent(cell(rightLabel, rightValue, rightColor))
+            .build()
+
+    /**
+     * Compact centred row showing cumulative steps since last reboot.
+     *
+     * Formatted as "12,345 steps" for a valid reading, or "— steps" when no
+     * sensor event has been received yet (hardware missing or first sample
+     * not yet delivered).
+     */
+    private fun stepsRow(steps: Long?): LayoutElement =
+        Box.Builder()
+            .setWidth(expand())
+            .setHeight(dp(STEP_ROW_HEIGHT))
+            .setVerticalAlignment(VERTICAL_ALIGN_CENTER)
+            .setHorizontalAlignment(HORIZONTAL_ALIGN_CENTER)
+            .addContent(
+                Text.Builder()
+                    .setText("${StatsTilePalette.formatSteps(steps)} steps")
+                    .setFontStyle(
+                        FontStyle.Builder()
+                            .setSize(sp(10f))
+                            .setColor(argb(COLOR_LABEL))
+                            .build(),
+                    )
+                    .build(),
+            )
             .build()
 
     /**
@@ -490,21 +568,24 @@ class StatsTileService : TileService() {
     }
 
     private companion object {
-        const val RESOURCES_VERSION = "marrow-stats-6"
+        const val RESOURCES_VERSION = "marrow-stats-7"
         const val FRESHNESS_MS = 30_000L
 
         // Layout dimensions (dp).
         const val OUTER_PADDING = 12f
         const val CELL_WIDTH = 70f
         // Trimmed 56 → 52 to make room for the network/temp footer row.
-        // Total height: 12 + 11 + 8 + 52 + 8 + 52 + 6 + 22 + 12 ≈ 183 dp.
+        // Added step-count row (v0.14.0): SPACING_NET trimmed 6 → 4 to offset.
+        // Total height: 12 + 11 + 8 + 52 + 8 + 52 + 4 + 16 + 4 + 22 + 12 ≈ 201 dp.
         // Pixel Watch 3 round display ≈ 205 dp — fits with comfortable margin.
         const val CELL_HEIGHT = 52f
         const val CELL_RADIUS = 18f
         const val SPACING_HEADER = 8f
         const val SPACING_ROW = 8f
         const val SPACING_CELL = 8f
-        const val SPACING_NET = 6f
+        const val SPACING_STEPS = 4f   // gap between second stats row and step row
+        const val STEP_ROW_HEIGHT = 16f
+        const val SPACING_NET = 4f     // trimmed from 6f to offset the new step row
         const val NET_ROW_HEIGHT = 22f
 
         // Text-tinting constants from the Talon orange family — mirrors
