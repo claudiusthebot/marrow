@@ -168,6 +168,7 @@ private fun SectionHero(vm: MarrowViewModel, section: Section, source: String) {
         Sections.DISPLAY -> DisplayHero(vm = vm, section = section)
         Sections.NETWORK -> NetworkHero(vm = vm, section = section)
         Sections.SENSORS -> EnvironmentHero(vm = vm, section = section, isPhone = source != "watch")
+        Sections.ACTIVITY -> ActivityHero(vm = vm, section = section)
         Sections.CAMERAS -> CamerasHero(section = section)
         Sections.BUILD_FLAGS -> BuildFlagsHero(section = section)
         Sections.DEVICE -> DeviceHero(section = section)

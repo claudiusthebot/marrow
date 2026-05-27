@@ -1114,6 +1114,52 @@ fun EnvironmentHero(vm: MarrowViewModel, section: Section, isPhone: Boolean) {
     }
 }
 
+// -- Activity (step counter) ------------------------------------------------
+
+/**
+ * Hero for the Activity section — shows steps accumulated since the last device
+ * reboot from [MarrowViewModel.stepCount] ([Sensor.TYPE_STEP_COUNTER]).
+ *
+ * The step counter is a hardware accumulator, not a daily step count: it starts
+ * at an arbitrary baseline on boot and increases monotonically. The displayed
+ * value resets on reboot. Thousand-separator formatting ("12,345") makes large
+ * step counts readable at a glance.
+ *
+ * The stat is hidden when the sensor has not yet fired (null state) — sensors
+ * can take a few seconds to deliver the first event on startup.
+ *
+ * Phone only. Zero permissions required (API 29+).
+ */
+@Composable
+fun ActivityHero(vm: MarrowViewModel, section: Section) {
+    val stepCount by vm.stepCount.collectAsState()
+
+    HeroBox {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconBadge(icon = MarrowIcons.forSection(section.id), size = 44, cornerRadius = 14)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        "Activity",
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    )
+                    Text(
+                        "Step counter · since last reboot",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            val steps = stepCount
+            if (steps != null) {
+                Spacer(Modifier.height(12.dp))
+                BigStat("Steps", "%,d".format(steps))
+            }
+        }
+    }
+}
+
 // -- Cameras -----------------------------------------------------------------
 
 @Composable

@@ -43,6 +43,7 @@ object DeviceInfoCollector {
             add(displaySection(context))
             add(networkSection(context))
             add(sensorsSection(context))
+            activitySection(context)?.let { add(it) }
             cameraSection(context)?.let { add(it) }
             add(buildFlagsSection())
             add(softwareSection(context))
@@ -399,6 +400,31 @@ object DeviceInfoCollector {
             Row(s.name, parts.joinToString(" · "))
         }
         return Section(Sections.SENSORS, "Sensors", "sensors", rows, "${all.size} sensors")
+    }
+
+    // -- Activity (step counter) ---------------------------------------------
+
+    /**
+     * Phone-only section for motion/fitness stats. Currently exposes the hardware
+     * step counter capability. The live accumulated step count (since last reboot)
+     * is read via [Sensor.TYPE_STEP_COUNTER] via a [SensorEventListener] in the
+     * ViewModel and displayed in [ActivityHero] — it cannot be read synchronously
+     * in a one-shot collector, so this section carries static capability rows only.
+     *
+     * Returns null on phones without a hardware step counter (e.g. many emulators)
+     * so no empty card appears in the UI.
+     */
+    private fun activitySection(context: Context): Section? {
+        val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val stepSensor = sm.getDefaultSensor(android.hardware.Sensor.TYPE_STEP_COUNTER) ?: return null
+        val rows = buildList {
+            add(Row("Step counter", stepSensor.name))
+            add(Row("Vendor", stepSensor.vendor))
+            add(Row("Version", "v${stepSensor.version}"))
+            if (stepSensor.power > 0f) add(Row("Power", "%.2f mA".format(stepSensor.power)))
+            add(Row("Note", "Steps accumulated since last reboot · zero permissions · API 29+"))
+        }
+        return Section(Sections.ACTIVITY, "Activity", "activity", rows, "Step counter available")
     }
 
     // -- Cameras -------------------------------------------------------------
