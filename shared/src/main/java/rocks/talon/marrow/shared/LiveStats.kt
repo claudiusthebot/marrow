@@ -716,6 +716,28 @@ object LiveStats {
         pm?.isPowerSaveMode
     }.getOrNull()
 
+
+    // -- Connectivity toggles ----------------------------------------------------
+
+    /**
+     * Whether airplane mode is currently enabled.
+     *
+     * Reads [Settings.Global.AIRPLANE_MODE_ON]. Zero permissions required.
+     */
+    fun isAirplaneModeOn(context: Context): Boolean =
+        Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) != 0
+
+    /**
+     * Whether NFC is currently enabled, or null if the device has no NFC hardware.
+     *
+     * Uses [android.nfc.NfcAdapter.getDefaultAdapter]; returns null when the adapter
+     * is not present (hardware absent). Zero additional permissions required.
+     */
+    fun isNfcEnabled(context: Context): Boolean? =
+        runCatching {
+            android.nfc.NfcAdapter.getDefaultAdapter(context)?.isEnabled
+        }.getOrNull()
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =
