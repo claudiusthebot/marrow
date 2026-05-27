@@ -965,6 +965,8 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
     val (rxBps, txBps) = networkRatePair
     val wifiRssiDbm by vm.wifiRssiDbm.collectAsState()
     val wifiLinkSpeedMbps by vm.wifiLinkSpeedMbps.collectAsState()
+    val isAirplaneModeOn by vm.isAirplaneModeOn.collectAsState()
+    val isNfcEnabled by vm.isNfcEnabled.collectAsState()
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1003,6 +1005,20 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
                     BigStat("↓ Download", LiveStats.formatSpeedBps(rxBps))
                     BigStat("↑ Upload", LiveStats.formatSpeedBps(txBps))
                 }
+            }
+            // Airplane mode — always shown once polled (non-null)
+            val airplaneOn = isAirplaneModeOn
+            if (airplaneOn != null) {
+                Spacer(Modifier.height(8.dp))
+                val airplaneColor = if (airplaneOn) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.onSurface
+                BigStat("Airplane Mode", if (airplaneOn) "On" else "Off", valueColor = airplaneColor)
+            }
+            // NFC — shown only when device has NFC hardware (non-null)
+            val nfcOn = isNfcEnabled
+            if (nfcOn != null) {
+                Spacer(Modifier.height(8.dp))
+                BigStat("NFC", if (nfcOn) "On" else "Off")
             }
         }
     }

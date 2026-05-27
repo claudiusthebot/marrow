@@ -126,6 +126,14 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _batterySaverActive = MutableStateFlow<Boolean?>(null)
     val batterySaverActive: StateFlow<Boolean?> = _batterySaverActive.asStateFlow()
 
+    /** Whether airplane mode is currently on. */
+    private val _isAirplaneModeOn = MutableStateFlow<Boolean?>(null)
+    val isAirplaneModeOn: StateFlow<Boolean?> = _isAirplaneModeOn.asStateFlow()
+
+    /** Whether NFC is enabled, null when device has no NFC hardware. */
+    private val _isNfcEnabled = MutableStateFlow<Boolean?>(null)
+    val isNfcEnabled: StateFlow<Boolean?> = _isNfcEnabled.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -226,6 +234,10 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _screenBrightnessAuto.value = LiveStats.screenBrightnessAuto(ctx)
                 // Battery saver mode — PowerManager.isPowerSaveMode(), no permissions needed
                 _batterySaverActive.value = LiveStats.batterySaverActive(ctx)
+                // Airplane mode — Settings.Global.AIRPLANE_MODE_ON, no permissions needed
+                _isAirplaneModeOn.value = LiveStats.isAirplaneModeOn(ctx)
+                // NFC state — NfcAdapter.getDefaultAdapter, null when no NFC hardware
+                _isNfcEnabled.value = LiveStats.isNfcEnabled(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }
