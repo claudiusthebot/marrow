@@ -974,6 +974,8 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
     val wifiLinkSpeedMbps by vm.wifiLinkSpeedMbps.collectAsState()
     val isAirplaneModeOn by vm.isAirplaneModeOn.collectAsState()
     val isNfcEnabled by vm.isNfcEnabled.collectAsState()
+    val totalRxBytes by vm.totalRxBytes.collectAsState()
+    val totalTxBytes by vm.totalTxBytes.collectAsState()
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1026,6 +1028,16 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
             if (nfcOn != null) {
                 Spacer(Modifier.height(8.dp))
                 BigStat("NFC", if (nfcOn) "On" else "Off")
+            }
+            // Network traffic totals since boot — shown when TrafficStats is available
+            val rxBytes = totalRxBytes
+            val txBytes = totalTxBytes
+            if (rxBytes != null || txBytes != null) {
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    if (rxBytes != null) BigStat("Total RX", LiveStats.formatBytes(rxBytes))
+                    if (txBytes != null) BigStat("Total TX", LiveStats.formatBytes(txBytes))
+                }
             }
         }
     }
