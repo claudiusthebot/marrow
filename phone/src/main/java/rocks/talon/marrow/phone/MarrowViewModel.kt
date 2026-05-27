@@ -143,6 +143,11 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _lightLux = MutableStateFlow<Float?>(null)
     val lightLux: StateFlow<Float?> = _lightLux.asStateFlow()
 
+    /** Barometric pressure in hPa from [Sensor.TYPE_PRESSURE]. null before first event or
+     *  when the device has no barometer hardware. Silent no-op on devices without the sensor. */
+    private val _pressureHpa = MutableStateFlow<Float?>(null)
+    val pressureHpa: StateFlow<Float?> = _pressureHpa.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -152,12 +157,14 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private var liveJob: Job? = null
     private var sensorManager: SensorManager? = null
     private var lightSensorListener: SensorEventListener? = null
+    private var pressureSensorListener: SensorEventListener? = null
 
     init {
         refreshPhone()
         requestWatchInfo()
         startLiveLoop()
         startLightSensor()
+        startPressureSensor()
     }
 
     // -- Operations --------------------------------------------------------------
@@ -283,9 +290,37 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
+    /**
+     * Registers a [SensorEventListener] for [Sensor.TYPE_PRESSURE] using
+     * [SensorManager.SENSOR_DELAY_NORMAL] (~200ms). Follows the same push-based
+     * pattern as [startLightSensor] — the hardware fires events on value change.
+     * The listener updates [_pressureHpa] directly (StateFlow is thread-safe).
+     *
+     * No-ops silently when the device has no barometer hardware.
+     */
+    private fun startPressureSensor() {
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_PRESSURE) ?: return
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                val hpa = event?.values?.firstOrNull() ?: return
+                _pressureHpa.value = hpa
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        pressureSensorListener = listener
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
     override fun onCleared() {
         liveJob?.cancel()
         lightSensorListener?.let { sensorManager?.unregisterListener(it) }
+        pressureSensorListener?.let {
+            (getApplication<Application>()
+                .getSystemService(Context.SENSOR_SERVICE) as? SensorManager)
+                ?.unregisterListener(it)
+        }
         super.onCleared()
     }
 }
