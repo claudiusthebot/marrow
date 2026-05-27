@@ -139,6 +139,18 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _isNfcEnabled = MutableStateFlow<Boolean?>(null)
     val isNfcEnabled: StateFlow<Boolean?> = _isNfcEnabled.asStateFlow()
 
+    /** Cumulative bytes received across all interfaces since the last device reboot.
+     *  Polled each live-loop tick from [LiveStats.totalRxBytes].
+     *  null when [android.net.TrafficStats.UNSUPPORTED] is returned by the system. */
+    private val _totalRxBytes = MutableStateFlow<Long?>(null)
+    val totalRxBytes: StateFlow<Long?> = _totalRxBytes.asStateFlow()
+
+    /** Cumulative bytes transmitted across all interfaces since the last device reboot.
+     *  Polled each live-loop tick from [LiveStats.totalTxBytes].
+     *  null when [android.net.TrafficStats.UNSUPPORTED] is returned by the system. */
+    private val _totalTxBytes = MutableStateFlow<Long?>(null)
+    val totalTxBytes: StateFlow<Long?> = _totalTxBytes.asStateFlow()
+
     /** Ambient light sensor reading in lux. null when no hardware or before first event. */
     private val _lightLux = MutableStateFlow<Float?>(null)
     val lightLux: StateFlow<Float?> = _lightLux.asStateFlow()
@@ -282,6 +294,9 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _isAirplaneModeOn.value = LiveStats.isAirplaneModeOn(ctx)
                 // NFC state — NfcAdapter.getDefaultAdapter, null when no NFC hardware
                 _isNfcEnabled.value = LiveStats.isNfcEnabled(ctx)
+                // Network traffic totals since boot — TrafficStats, polled, no permissions needed
+                _totalRxBytes.value = LiveStats.totalRxBytes()
+                _totalTxBytes.value = LiveStats.totalTxBytes()
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }

@@ -738,6 +738,45 @@ object LiveStats {
             android.nfc.NfcAdapter.getDefaultAdapter(context)?.isEnabled
         }.getOrNull()
 
+    // -- Network traffic totals -------------------------------------------------
+
+    /**
+     * Total bytes received across all network interfaces since the last device boot.
+     *
+     * Reads [android.net.TrafficStats.getTotalRxBytes]. No permissions required.
+     * Returns null when the counter is unavailable
+     * ([android.net.TrafficStats.UNSUPPORTED] = -1L).
+     */
+    fun totalRxBytes(): Long? {
+        val v = android.net.TrafficStats.getTotalRxBytes()
+        return if (v == android.net.TrafficStats.UNSUPPORTED.toLong()) null else v
+    }
+
+    /**
+     * Total bytes transmitted across all network interfaces since the last device boot.
+     *
+     * Reads [android.net.TrafficStats.getTotalTxBytes]. No permissions required.
+     * Returns null when the counter is unavailable
+     * ([android.net.TrafficStats.UNSUPPORTED] = -1L).
+     */
+    fun totalTxBytes(): Long? {
+        val v = android.net.TrafficStats.getTotalTxBytes()
+        return if (v == android.net.TrafficStats.UNSUPPORTED.toLong()) null else v
+    }
+
+    /**
+     * Formats a byte count as a concise human-readable string using SI prefixes.
+     *
+     * Examples: 999 → "999 B", 1234 → "1.2 KB", 1_234_567 → "1.2 MB",
+     * 1_234_567_890 → "1.2 GB".
+     */
+    fun formatBytes(bytes: Long): String = when {
+        bytes >= 1_000_000_000L -> "%.1f GB".format(bytes / 1_000_000_000f)
+        bytes >= 1_000_000L     -> "%.1f MB".format(bytes / 1_000_000f)
+        bytes >= 1_000L         -> "%.1f KB".format(bytes / 1_000f)
+        else                    -> "$bytes B"
+    }
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =
