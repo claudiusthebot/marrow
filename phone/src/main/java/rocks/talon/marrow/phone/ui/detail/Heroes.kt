@@ -1060,6 +1060,54 @@ fun SensorsHero(section: Section, isPhone: Boolean) {
     }
 }
 
+// -- Environment (barometric pressure, ambient sensors) ----------------------
+
+/**
+ * Hero for the Sensors section — supersedes the old static [SensorsHero] by
+ * showing a prominent live pressure reading from the ViewModel's
+ * [MarrowViewModel.pressureHpa] StateFlow alongside the full [LiveSensorPanel].
+ *
+ * Pressure is displayed as a [BigStat] when barometer hardware is present and
+ * has fired at least one event. Devices without a barometer omit the stat
+ * silently. The [LiveSensorPanel] below continues to show accelerometer, light,
+ * proximity, ambient temperature, and pressure tiles via its own listeners —
+ * the [BigStat] here is the persistent ViewModel-sourced reading (available
+ * across the whole app lifetime, not just while this composable is on screen).
+ */
+@Composable
+fun EnvironmentHero(vm: MarrowViewModel, section: Section, isPhone: Boolean) {
+    val pressureHpa by vm.pressureHpa.collectAsState()
+
+    HeroBox {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconBadge(icon = MarrowIcons.Sensors, size = 44, cornerRadius = 14)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        "${section.rows.size} sensors",
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    )
+                    Text(
+                        if (isPhone) "Tap a sensor below to see live readings" else "Static read of the watch's sensor list",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            val hpa = pressureHpa
+            if (isPhone && hpa != null) {
+                Spacer(Modifier.height(12.dp))
+                BigStat("Pressure", "%.1f hPa".format(hpa))
+            }
+            if (isPhone) {
+                Spacer(Modifier.height(16.dp))
+                LiveSensorPanel()
+            }
+        }
+    }
+}
+
 // -- Cameras -----------------------------------------------------------------
 
 @Composable
