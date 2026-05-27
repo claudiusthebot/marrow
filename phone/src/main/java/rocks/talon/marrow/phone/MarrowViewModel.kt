@@ -1,6 +1,11 @@
 package rocks.talon.marrow.phone
 
 import android.app.Application
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -134,6 +139,10 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _isNfcEnabled = MutableStateFlow<Boolean?>(null)
     val isNfcEnabled: StateFlow<Boolean?> = _isNfcEnabled.asStateFlow()
 
+    /** Ambient light sensor reading in lux. null when no hardware or before first event. */
+    private val _lightLux = MutableStateFlow<Float?>(null)
+    val lightLux: StateFlow<Float?> = _lightLux.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -141,11 +150,14 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     private var liveJob: Job? = null
+    private var sensorManager: SensorManager? = null
+    private var lightSensorListener: SensorEventListener? = null
 
     init {
         refreshPhone()
         requestWatchInfo()
         startLiveLoop()
+        startLightSensor()
     }
 
     // -- Operations --------------------------------------------------------------
@@ -244,8 +256,36 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // -- Sensor listeners --------------------------------------------------------
+
+    /**
+     * Registers a [SensorEventListener] for [Sensor.TYPE_LIGHT] using
+     * [SensorManager.SENSOR_DELAY_NORMAL] (~200ms). Unlike polled stats, the
+     * ambient-light sensor is push-based — it fires on value changes rather than
+     * on a fixed timer. The listener updates [_lightLux] directly; the StateFlow
+     * is thread-safe so no coroutine dispatch is needed.
+     *
+     * No-ops silently when the device has no ambient-light sensor hardware.
+     */
+    private fun startLightSensor() {
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_LIGHT) ?: return
+        sensorManager = sm
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                val lux = event?.values?.firstOrNull() ?: return
+                _lightLux.value = lux
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        lightSensorListener = listener
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
     override fun onCleared() {
         liveJob?.cancel()
+        lightSensorListener?.let { sensorManager?.unregisterListener(it) }
         super.onCleared()
     }
 }

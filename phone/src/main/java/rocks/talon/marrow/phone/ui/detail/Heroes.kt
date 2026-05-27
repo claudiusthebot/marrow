@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import rocks.talon.marrow.phone.MarrowViewModel
 import rocks.talon.marrow.phone.ui.components.IconBadge
 import rocks.talon.marrow.phone.ui.components.MarrowCard
@@ -890,6 +891,7 @@ private fun VolumeRow(vol: LiveStats.Volume) {
 fun DisplayHero(vm: MarrowViewModel, section: Section) {
     val screenBrightnessPct by vm.screenBrightnessPct.collectAsState()
     val screenBrightnessAuto by vm.screenBrightnessAuto.collectAsState()
+    val lightLux by vm.lightLux.collectAsState()
     val res = section.rows.firstOrNull { it.label == "Resolution" }?.value ?: "—"
     val dpi = section.rows.firstOrNull { it.label == "Density" }?.value ?: "—"
     val refresh = section.rows.firstOrNull { it.label == "Refresh rate" }?.value ?: "—"
@@ -947,6 +949,11 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
                     Spacer(Modifier.height(4.dp))
                     BigStat("Br. Mode", if (autoMode) "Auto" else "Manual")
                 }
+            }
+            val lux = lightLux
+            if (lux != null) {
+                Spacer(Modifier.height(4.dp))
+                BigStat("Ambient", "${lux.roundToInt()} lux")
             }
         }
     }
