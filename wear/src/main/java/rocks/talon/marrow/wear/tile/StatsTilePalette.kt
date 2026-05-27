@@ -121,4 +121,14 @@ internal object StatsTilePalette {
         tempC < 70f -> COLOR_TEMP_WARM
         else        -> COLOR_TEMP_HOT
     }
+
+    /**
+     * Compact step-count label.
+     *
+     * Returns the step count with thousand-separator (e.g. "12,345") for a
+     * valid reading, or "—" when no sensor event has been received yet
+     * (sensor hardware missing or first sample not yet delivered).
+     */
+    fun formatSteps(steps: Long?): String =
+        if (steps == null) "—" else "%,d".format(steps)
 }
