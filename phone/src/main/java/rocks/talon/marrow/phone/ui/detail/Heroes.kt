@@ -1077,6 +1077,7 @@ fun SensorsHero(section: Section, isPhone: Boolean) {
 @Composable
 fun EnvironmentHero(vm: MarrowViewModel, section: Section, isPhone: Boolean) {
     val pressureHpa by vm.pressureHpa.collectAsState()
+    val ambientTempC by vm.ambientTempC.collectAsState()
 
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
@@ -1099,6 +1100,11 @@ fun EnvironmentHero(vm: MarrowViewModel, section: Section, isPhone: Boolean) {
             if (isPhone && hpa != null) {
                 Spacer(Modifier.height(12.dp))
                 BigStat("Pressure", "%.1f hPa".format(hpa))
+            }
+            val tempC = ambientTempC
+            if (isPhone && tempC != null) {
+                Spacer(Modifier.height(12.dp))
+                BigStat("Amb. Temp", "%.1f °C".format(tempC))
             }
             if (isPhone) {
                 Spacer(Modifier.height(16.dp))

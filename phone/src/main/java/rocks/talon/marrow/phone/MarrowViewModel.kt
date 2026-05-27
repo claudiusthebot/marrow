@@ -148,6 +148,12 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _pressureHpa = MutableStateFlow<Float?>(null)
     val pressureHpa: StateFlow<Float?> = _pressureHpa.asStateFlow()
 
+    /** Ambient air temperature in °C from [Sensor.TYPE_AMBIENT_TEMPERATURE]. null before first
+     *  event or when the device has no ambient temperature sensor hardware. This sensor is rare
+     *  on consumer Android phones — most devices will stay null indefinitely. Silent no-op. */
+    private val _ambientTempC = MutableStateFlow<Float?>(null)
+    val ambientTempC: StateFlow<Float?> = _ambientTempC.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -158,6 +164,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private var sensorManager: SensorManager? = null
     private var lightSensorListener: SensorEventListener? = null
     private var pressureSensorListener: SensorEventListener? = null
+    private var ambientTempSensorListener: SensorEventListener? = null
 
     init {
         refreshPhone()
@@ -165,6 +172,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         startLiveLoop()
         startLightSensor()
         startPressureSensor()
+        startAmbientTempSensor()
     }
 
     // -- Operations --------------------------------------------------------------
@@ -313,14 +321,37 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
+    /**
+     * Registers a [SensorEventListener] for [Sensor.TYPE_AMBIENT_TEMPERATURE] using
+     * [SensorManager.SENSOR_DELAY_NORMAL] (~200ms). Follows the same push-based pattern
+     * as [startLightSensor] and [startPressureSensor] — events fire on value change.
+     * The listener updates [_ambientTempC] directly (StateFlow is thread-safe).
+     *
+     * This sensor is rare on consumer Android phones (mostly present on IoT/industrial
+     * devices). No-ops silently when the device has no ambient temperature hardware.
+     */
+    private fun startAmbientTempSensor() {
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_AMBIENT_TEMPERATURE) ?: return
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                val tempC = event?.values?.firstOrNull() ?: return
+                _ambientTempC.value = tempC
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        ambientTempSensorListener = listener
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
     override fun onCleared() {
         liveJob?.cancel()
         lightSensorListener?.let { sensorManager?.unregisterListener(it) }
-        pressureSensorListener?.let {
-            (getApplication<Application>()
-                .getSystemService(Context.SENSOR_SERVICE) as? SensorManager)
-                ?.unregisterListener(it)
-        }
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        pressureSensorListener?.let { sm?.unregisterListener(it) }
+        ambientTempSensorListener?.let { sm?.unregisterListener(it) }
         super.onCleared()
     }
 }
