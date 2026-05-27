@@ -73,9 +73,9 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
 
     // Glance — Jetpack Compose for home-screen widgets.
-    // glance-material3 provides GlanceTheme with M3 dynamic-color support.
+    // glance-material3 dropped: GlanceTheme not exported cleanly from 1.1.0
+    // with this Compose-BOM; using ColorProvider directly instead.
     implementation("androidx.glance:glance-appwidget:1.1.0")
-    implementation("androidx.glance:glance-material3:1.1.0")
 
     // Squircle shapes — smooth superellipse corners matching PixelPlayer's visual language.
     // AbsoluteSmoothCornerShape(28.dp, 60) for capability cards;
