@@ -1098,6 +1098,7 @@ fun EnvironmentHero(vm: MarrowViewModel, section: Section, isPhone: Boolean) {
     val ambientTempC by vm.ambientTempC.collectAsState()
     val tiltAngleDeg by vm.tiltAngleDeg.collectAsState()
     val magneticFieldUt by vm.magneticFieldUt.collectAsState()
+    val proximityDistanceCm by vm.proximityDistanceCm.collectAsState()
 
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
@@ -1135,6 +1136,18 @@ fun EnvironmentHero(vm: MarrowViewModel, section: Section, isPhone: Boolean) {
             if (isPhone && magUt != null) {
                 Spacer(Modifier.height(12.dp))
                 BigStat("Mag. Field", "%.1f µT".format(magUt))
+            }
+            val proxCm = proximityDistanceCm
+            if (isPhone && proxCm != null) {
+                val isNear = proxCm <= 1.0f
+                val proxColor = if (isNear) MaterialTheme.colorScheme.error
+                                else Color(0xFF66BB6A)
+                Spacer(Modifier.height(12.dp))
+                BigStat(
+                    "Proximity",
+                    if (isNear) "Near" else "%.1f cm".format(proxCm),
+                    valueColor = proxColor,
+                )
             }
             if (isPhone) {
                 Spacer(Modifier.height(16.dp))
