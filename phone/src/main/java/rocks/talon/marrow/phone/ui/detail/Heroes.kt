@@ -1097,6 +1097,7 @@ fun EnvironmentHero(vm: MarrowViewModel, section: Section, isPhone: Boolean) {
     val pressureHpa by vm.pressureHpa.collectAsState()
     val ambientTempC by vm.ambientTempC.collectAsState()
     val tiltAngleDeg by vm.tiltAngleDeg.collectAsState()
+    val magneticFieldUt by vm.magneticFieldUt.collectAsState()
 
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
@@ -1129,6 +1130,11 @@ fun EnvironmentHero(vm: MarrowViewModel, section: Section, isPhone: Boolean) {
             if (isPhone && tilt != null) {
                 Spacer(Modifier.height(12.dp))
                 BigStat("Tilt", "%.1f°".format(tilt))
+            }
+            val magUt = magneticFieldUt
+            if (isPhone && magUt != null) {
+                Spacer(Modifier.height(12.dp))
+                BigStat("Mag. Field", "%.1f µT".format(magUt))
             }
             if (isPhone) {
                 Spacer(Modifier.height(16.dp))
