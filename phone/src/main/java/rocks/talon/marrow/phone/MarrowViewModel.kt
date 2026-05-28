@@ -192,6 +192,18 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _screenRefreshRateHz = MutableStateFlow<Float?>(null)
     val screenRefreshRateHz: StateFlow<Float?> = _screenRefreshRateHz.asStateFlow()
 
+    /**
+     * Live compass bearing in degrees (0–360) from [Sensor.TYPE_ROTATION_VECTOR].
+     * The rotation vector sensor fuses accelerometer + magnetometer + gyroscope via
+     * Android's built-in sensor fusion stack — no raw sensor maths required.
+     * null before the first sensor event fires or on devices without the hardware.
+     *
+     * Zero permissions required. Silent no-op on devices without the sensor
+     * (TYPE_ROTATION_VECTOR is available on API 9+ and present on all modern flagships).
+     */
+    private val _compassBearingDeg = MutableStateFlow<Float?>(null)
+    val compassBearingDeg: StateFlow<Float?> = _compassBearingDeg.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -204,6 +216,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private var pressureSensorListener: SensorEventListener? = null
     private var ambientTempSensorListener: SensorEventListener? = null
     private var stepCounterListener: SensorEventListener? = null
+    private var rotationVectorListener: SensorEventListener? = null
 
     init {
         refreshPhone()
@@ -213,6 +226,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         startPressureSensor()
         startAmbientTempSensor()
         startStepCounterSensor()
+        startRotationVectorSensor()
     }
 
     // -- Operations --------------------------------------------------------------
@@ -417,6 +431,40 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
+    /**
+     * Registers a [SensorEventListener] for [Sensor.TYPE_ROTATION_VECTOR] using
+     * [SensorManager.SENSOR_DELAY_NORMAL] (~200ms). The rotation vector is a virtual /
+     * composite sensor that fuses accelerometer + magnetometer + gyroscope data via
+     * Android's own sensor fusion stack, producing a smoothed orientation estimate.
+     *
+     * The azimuth (orientation[0]) is extracted via [SensorManager.getRotationMatrixFromVector]
+     * + [SensorManager.getOrientation], then converted from radians to a 0–360° bearing and
+     * stored in [_compassBearingDeg]. Updates [_compassBearingDeg] directly from the hardware
+     * callback thread — [MutableStateFlow] is thread-safe, no coroutine dispatch needed.
+     *
+     * Zero permissions required. Silent no-op on devices without the sensor (extremely rare;
+     * [Sensor.TYPE_ROTATION_VECTOR] has been mandatory since Android 2.3).
+     */
+    private fun startRotationVectorSensor() {
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) ?: return
+        val rotMat = FloatArray(9)
+        val orientation = FloatArray(3)
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                val v = event?.values ?: return
+                SensorManager.getRotationMatrixFromVector(rotMat, v)
+                SensorManager.getOrientation(rotMat, orientation)
+                val deg = (Math.toDegrees(orientation[0].toDouble()).toFloat() + 360f) % 360f
+                _compassBearingDeg.value = deg
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        rotationVectorListener = listener
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
     override fun onCleared() {
         liveJob?.cancel()
         lightSensorListener?.let { sensorManager?.unregisterListener(it) }
@@ -425,6 +473,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         pressureSensorListener?.let { sm?.unregisterListener(it) }
         ambientTempSensorListener?.let { sm?.unregisterListener(it) }
         stepCounterListener?.let { sm?.unregisterListener(it) }
+        rotationVectorListener?.let { sm?.unregisterListener(it) }
         super.onCleared()
     }
 }
