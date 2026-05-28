@@ -706,6 +706,24 @@ object LiveStats {
         null
     }
 
+    // -- Display refresh rate ---------------------------------------------------
+
+    /**
+     * Current screen refresh rate in Hz.
+     *
+     * Reads [android.view.Display.getRefreshRate] via [Context.getDisplay] (API 30+,
+     * matching Marrow's minSdk). On fixed-rate displays this always returns the panel's
+     * configured rate. On LTPO / VRR panels (e.g. Pixel 8 Pro, Samsung Galaxy S24 Ultra)
+     * the value adapts dynamically — 120 Hz when scrolling, as low as 1 Hz when the
+     * screen is static. No permissions required.
+     *
+     * Returns null when [Context.getDisplay] is unavailable (service environment,
+     * non-UI context, or unusual device configuration).
+     */
+    fun screenRefreshRateHz(context: Context): Float? = runCatching {
+        context.display?.refreshRate?.takeIf { it > 0f }
+    }.getOrNull()
+
 
     /**
      * Returns whether battery saver (low-power) mode is currently active,
