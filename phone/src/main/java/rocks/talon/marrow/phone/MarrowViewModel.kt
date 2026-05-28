@@ -259,6 +259,18 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _magneticFieldUt = MutableStateFlow<Float?>(null)
     val magneticFieldUt: StateFlow<Float?> = _magneticFieldUt.asStateFlow()
 
+    // -- Proximity ---------------------------------------------------------------
+
+    /**
+     * Distance to the nearest detected object from [Sensor.TYPE_PROXIMITY] in centimetres.
+     * On most phones the sensor is binary: 0.0 cm = object detected (NEAR), and
+     * [Sensor.getMaximumRange] (typically 5.0 cm) = no object (FAR). Some phones
+     * (e.g. Sony Xperia) return actual interpolated distances. null before the first
+     * sensor event. Phone only. Zero permissions required.
+     */
+    private val _proximityDistanceCm = MutableStateFlow<Float?>(null)
+    val proximityDistanceCm: StateFlow<Float?> = _proximityDistanceCm.asStateFlow()
+
     // -- Audio -------------------------------------------------------------------
 
     /** Current ringer mode from [android.media.AudioManager]. null when unavailable.
@@ -295,6 +307,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private var gyroscopeListener: SensorEventListener? = null
     private var linearAccelListener: SensorEventListener? = null
     private var magnetometerListener: SensorEventListener? = null
+    private var proximityListener: SensorEventListener? = null
 
     init {
         refreshPhone()
@@ -309,6 +322,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         startGyroscopeSensor()
         startLinearAccelSensor()
         startMagnetometerSensor()
+        startProximitySensor()
     }
 
     // -- Operations --------------------------------------------------------------
@@ -657,6 +671,32 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
+    /**
+     * Registers a [SensorEventListener] for [Sensor.TYPE_PROXIMITY] at
+     * [SensorManager.SENSOR_DELAY_NORMAL]. Reports distance to the nearest
+     * detected object in centimetres, stored in [_proximityDistanceCm].
+     *
+     * On most phones the sensor is binary: 0.0 cm when an object is near the
+     * earpiece (call proximity) and [Sensor.getMaximumRange] (typically 5.0 cm)
+     * when no object is detected. Some devices return interpolated values.
+     * Useful for detecting whether the phone is held to the ear, face-down on a
+     * surface, or placed near a reflective object. Zero permissions required.
+     */
+    private fun startProximitySensor() {
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_PROXIMITY) ?: return
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                val dist = event?.values?.getOrNull(0) ?: return
+                _proximityDistanceCm.value = dist
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        proximityListener = listener
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
     override fun onCleared() {
         liveJob?.cancel()
         lightSensorListener?.let { sensorManager?.unregisterListener(it) }
@@ -670,6 +710,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         gyroscopeListener?.let { sm?.unregisterListener(it) }
         linearAccelListener?.let { sm?.unregisterListener(it) }
         magnetometerListener?.let { sm?.unregisterListener(it) }
+        proximityListener?.let { sm?.unregisterListener(it) }
         super.onCleared()
     }
 }
