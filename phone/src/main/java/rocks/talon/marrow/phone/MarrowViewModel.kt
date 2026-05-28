@@ -213,6 +213,16 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _tiltAngleDeg = MutableStateFlow<Float?>(null)
     val tiltAngleDeg: StateFlow<Float?> = _tiltAngleDeg.asStateFlow()
 
+    /** Gyroscope rotation rate magnitude in rad/s from [Sensor.TYPE_GYROSCOPE].
+     * magnitude = √(ωx² + ωy² + ωz²), where (ωx, ωy, ωz) are angular velocities
+     * around the X, Y, and Z axes respectively.
+     * 0 rad/s = device at rest; increases as the device rotates.
+     * null before first sensor event or on devices without a gyroscope.
+     * Zero permissions required.
+     */
+    private val _gyroMagnitude = MutableStateFlow<Float?>(null)
+    val gyroMagnitude: StateFlow<Float?> = _gyroMagnitude.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -227,6 +237,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private var stepCounterListener: SensorEventListener? = null
     private var rotationVectorListener: SensorEventListener? = null
     private var gravitySensorListener: SensorEventListener? = null
+    private var gyroscopeListener: SensorEventListener? = null
 
     init {
         refreshPhone()
@@ -238,6 +249,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         startStepCounterSensor()
         startRotationVectorSensor()
         startGravitySensor()
+        startGyroscopeSensor()
     }
 
     // -- Operations --------------------------------------------------------------
@@ -504,6 +516,30 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
+    /**
+     * Registers a [SensorEventListener] for [Sensor.TYPE_GYROSCOPE] using
+     * [SensorManager.SENSOR_DELAY_NORMAL] (~200ms). Reports angular velocity in rad/s
+     * around each axis. Magnitude = √(ωx² + ωy² + ωz²) is stored in [_gyroMagnitude].
+     * 0 rad/s at rest; increases when the device rotates.
+     * Zero permissions required.
+     */
+    private fun startGyroscopeSensor() {
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_GYROSCOPE) ?: return
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                val v = event?.values ?: return
+                val wx = v[0]; val wy = v[1]; val wz = v[2]
+                val mag = Math.sqrt((wx * wx + wy * wy + wz * wz).toDouble()).toFloat()
+                _gyroMagnitude.value = mag
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        gyroscopeListener = listener
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
     override fun onCleared() {
         liveJob?.cancel()
         lightSensorListener?.let { sensorManager?.unregisterListener(it) }
@@ -514,6 +550,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         stepCounterListener?.let { sm?.unregisterListener(it) }
         rotationVectorListener?.let { sm?.unregisterListener(it) }
         gravitySensorListener?.let { sm?.unregisterListener(it) }
+        gyroscopeListener?.let { sm?.unregisterListener(it) }
         super.onCleared()
     }
 }
