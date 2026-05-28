@@ -49,6 +49,8 @@ object Sections {
     const val GPU = "gpu"
     /** Phone-only activity section: step counter and future motion/fitness stats. */
     const val ACTIVITY = "activity"
+    /** Phone-only audio section: ringer mode, media volume, and music-active status. */
+    const val AUDIO = "audio"
 }
 
 object MarrowPaths {

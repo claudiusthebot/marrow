@@ -795,6 +795,56 @@ object LiveStats {
         else                    -> "$bytes B"
     }
 
+    // -- Audio -------------------------------------------------------------------
+
+    /** Current ringer mode from [android.media.AudioManager.getRingerMode]. */
+    enum class RingerMode { NORMAL, VIBRATE, SILENT }
+
+    /**
+     * Current ringer mode, or null when [AudioManager] is unavailable.
+     *
+     * Maps [android.media.AudioManager.RINGER_MODE_NORMAL] / [RINGER_MODE_VIBRATE] /
+     * [RINGER_MODE_SILENT] to [RingerMode]. No permissions required.
+     */
+    fun ringerMode(context: Context): RingerMode? = runCatching {
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            ?: return@runCatching null
+        when (am.ringerMode) {
+            android.media.AudioManager.RINGER_MODE_NORMAL  -> RingerMode.NORMAL
+            android.media.AudioManager.RINGER_MODE_VIBRATE -> RingerMode.VIBRATE
+            android.media.AudioManager.RINGER_MODE_SILENT  -> RingerMode.SILENT
+            else -> null
+        }
+    }.getOrNull()
+
+    /**
+     * Current media (music) stream volume as a percentage (0–100).
+     *
+     * Reads [android.media.AudioManager.getStreamVolume] /
+     * [android.media.AudioManager.getStreamMaxVolume] for [STREAM_MUSIC].
+     * Returns null when [AudioManager] is unavailable or max volume is 0.
+     * No permissions required.
+     */
+    fun mediaVolumePct(context: Context): Int? = runCatching {
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            ?: return@runCatching null
+        val max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+        if (max <= 0) return@runCatching null
+        val cur = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+        (cur * 100 / max).coerceIn(0, 100)
+    }.getOrNull()
+
+    /**
+     * Whether music is currently active (playing or paused-recently) via
+     * [android.media.AudioManager.isMusicActive]. No permissions required.
+     * Returns null when [AudioManager] is unavailable.
+     */
+    fun isMusicActive(context: Context): Boolean? = runCatching {
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            ?: return@runCatching null
+        am.isMusicActive
+    }.getOrNull()
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =

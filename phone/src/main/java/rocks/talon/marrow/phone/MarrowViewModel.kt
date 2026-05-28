@@ -239,6 +239,25 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _linearAccelMagnitude = MutableStateFlow<Float?>(null)
     val linearAccelMagnitude: StateFlow<Float?> = _linearAccelMagnitude.asStateFlow()
 
+    // -- Audio -------------------------------------------------------------------
+
+    /** Current ringer mode from [android.media.AudioManager]. null when unavailable.
+     *  Polled each live-loop tick. No permissions required. */
+    private val _ringerMode = MutableStateFlow<LiveStats.RingerMode?>(null)
+    val ringerMode: StateFlow<LiveStats.RingerMode?> = _ringerMode.asStateFlow()
+
+    /** Current media (music) stream volume as a percentage (0–100).
+     *  null when [android.media.AudioManager] is unavailable or max volume is 0.
+     *  Polled each live-loop tick. No permissions required. */
+    private val _mediaVolumePct = MutableStateFlow<Int?>(null)
+    val mediaVolumePct: StateFlow<Int?> = _mediaVolumePct.asStateFlow()
+
+    /** Whether music is currently active via [android.media.AudioManager.isMusicActive].
+     *  null when [AudioManager] is unavailable. Polled each live-loop tick.
+     *  No permissions required. */
+    private val _isMusicActive = MutableStateFlow<Boolean?>(null)
+    val isMusicActive: StateFlow<Boolean?> = _isMusicActive.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -365,6 +384,10 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _totalTxBytes.value = LiveStats.totalTxBytes()
                 // Screen refresh rate — Display.getRefreshRate(), no permissions needed
                 _screenRefreshRateHz.value = LiveStats.screenRefreshRateHz(ctx)
+                // Audio stats — AudioManager, no permissions needed
+                _ringerMode.value = LiveStats.ringerMode(ctx)
+                _mediaVolumePct.value = LiveStats.mediaVolumePct(ctx)
+                _isMusicActive.value = LiveStats.isMusicActive(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }
