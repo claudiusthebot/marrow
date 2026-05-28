@@ -1174,6 +1174,7 @@ private fun degreesToCompassPoint(deg: Float): String {
 fun ActivityHero(vm: MarrowViewModel, section: Section) {
     val stepCount by vm.stepCount.collectAsState()
     val compassBearingDeg by vm.compassBearingDeg.collectAsState()
+    val gyroMagnitude by vm.gyroMagnitude.collectAsState()
 
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
@@ -1186,7 +1187,7 @@ fun ActivityHero(vm: MarrowViewModel, section: Section) {
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     )
                     Text(
-                        "Steps · heading · since last reboot",
+                        "Steps · heading · rotation · since last reboot",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1201,6 +1202,11 @@ fun ActivityHero(vm: MarrowViewModel, section: Section) {
             if (bearing != null) {
                 Spacer(Modifier.height(8.dp))
                 BigStat("Bearing", "${degreesToCompassPoint(bearing)} ${bearing.roundToInt()}°")
+            }
+            val gyro = gyroMagnitude
+            if (gyro != null) {
+                Spacer(Modifier.height(8.dp))
+                BigStat("Rotation", "%.2f rad/s".format(gyro))
             }
         }
     }
