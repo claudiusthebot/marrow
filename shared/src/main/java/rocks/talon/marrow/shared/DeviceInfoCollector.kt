@@ -44,6 +44,7 @@ object DeviceInfoCollector {
             add(networkSection(context))
             add(sensorsSection(context))
             activitySection(context)?.let { add(it) }
+            audioSection(context)?.let { add(it) }
             cameraSection(context)?.let { add(it) }
             add(buildFlagsSection())
             add(softwareSection(context))
@@ -425,6 +426,24 @@ object DeviceInfoCollector {
             add(Row("Note", "Steps accumulated since last reboot · zero permissions · API 29+"))
         }
         return Section(Sections.ACTIVITY, "Activity", "activity", rows, "Step counter available")
+    }
+
+    private fun audioSection(context: Context): Section? {
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            ?: return null
+        val maxMusic = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+        val rows = buildList {
+            add(Row("Ringer mode", when (am.ringerMode) {
+                android.media.AudioManager.RINGER_MODE_NORMAL -> "Normal"
+                android.media.AudioManager.RINGER_MODE_VIBRATE -> "Vibrate"
+                android.media.AudioManager.RINGER_MODE_SILENT -> "Silent"
+                else -> "Unknown"
+            }))
+            if (maxMusic > 0) add(Row("Media volume", "${am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)} / $maxMusic"))
+            add(Row("Music active", if (am.isMusicActive) "Yes" else "No"))
+            add(Row("Note", "Live stats via AudioManager · zero permissions"))
+        }
+        return Section(Sections.AUDIO, "Audio", "audio", rows, "Ringer · volume · music")
     }
 
     // -- Cameras -------------------------------------------------------------

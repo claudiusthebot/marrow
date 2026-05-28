@@ -259,6 +259,19 @@ object MarrowIcons {
             .stroke("M12 10 L15 12")
     }
 
+    /**
+     * Audio: speaker cone with two sound-wave arcs.
+     * Body is a pentagon (flat back, angled front); two arcs radiate from the horn tip.
+     */
+    val Audio: ImageVector = marrow("Audio") {
+        // Speaker body (flat back on left, angled sides forming the cone/horn)
+        stroke("M5 10 H3 A1 1 0 0 0 2 11 V13 A1 1 0 0 0 3 14 H5 L9 17 V7 Z")
+            // Small wave
+            .stroke("M12 9.5 a3 3 0 0 1 0 5")
+            // Large wave
+            .stroke("M14.5 7 a5.5 5.5 0 0 1 0 10")
+    }
+
     /** Brand mark — small "M" tilted, used in the wordmark. */
     val Wordmark: ImageVector = marrow("Wordmark") {
         stroke("M4 19 V5 L12 13 L20 5 V19", width = 2.25f)
@@ -288,6 +301,7 @@ object MarrowIcons {
         Sections.SOFTWARE -> Software
         Sections.GPU -> Gpu
         Sections.ACTIVITY -> Activity
+        Sections.AUDIO -> Audio
         else -> Device
     }
 }

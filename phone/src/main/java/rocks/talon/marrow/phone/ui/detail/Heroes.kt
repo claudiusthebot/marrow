@@ -1224,6 +1224,73 @@ fun ActivityHero(vm: MarrowViewModel, section: Section) {
     }
 }
 
+// -- Audio -------------------------------------------------------------------
+
+/**
+ * Hero for the Audio section — shows ringer mode, media volume %, and music-active
+ * state polled from [android.media.AudioManager] via the live loop.
+ *
+ * **Ringer mode** colours: green = Normal, amber = Vibrate, error-red = Silent.
+ * **Music active** colours: accent = Playing, dim = Idle.
+ * **Media volume** renders as a plain percentage.
+ *
+ * All stats are polled by [MarrowViewModel]'s live loop (no sensor listeners needed).
+ * Phone only. Zero permissions required.
+ */
+@Composable
+fun AudioHero(vm: MarrowViewModel, section: Section) {
+    val ringerMode by vm.ringerMode.collectAsState()
+    val mediaVolumePct by vm.mediaVolumePct.collectAsState()
+    val isMusicActive by vm.isMusicActive.collectAsState()
+
+    HeroBox {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconBadge(icon = MarrowIcons.forSection(section.id), size = 44, cornerRadius = 14)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        "Audio",
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    )
+                    Text(
+                        "Ringer mode · media volume · music state",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            val mode = ringerMode
+            if (mode != null) {
+                val modeColor = when (mode) {
+                    rocks.talon.marrow.shared.LiveStats.RingerMode.NORMAL  -> Color(0xFF66BB6A)
+                    rocks.talon.marrow.shared.LiveStats.RingerMode.VIBRATE -> Color(0xFFFFA726)
+                    rocks.talon.marrow.shared.LiveStats.RingerMode.SILENT  -> MaterialTheme.colorScheme.error
+                }
+                val modeLabel = when (mode) {
+                    rocks.talon.marrow.shared.LiveStats.RingerMode.NORMAL  -> "Normal"
+                    rocks.talon.marrow.shared.LiveStats.RingerMode.VIBRATE -> "Vibrate"
+                    rocks.talon.marrow.shared.LiveStats.RingerMode.SILENT  -> "Silent"
+                }
+                Spacer(Modifier.height(12.dp))
+                BigStat("Ringer", modeLabel, valueColor = modeColor)
+            }
+            val vol = mediaVolumePct
+            if (vol != null) {
+                Spacer(Modifier.height(8.dp))
+                BigStat("Media Vol", "$vol%")
+            }
+            val music = isMusicActive
+            if (music != null) {
+                val musicColor = if (music) MaterialTheme.colorScheme.primary
+                                 else MaterialTheme.colorScheme.onSurfaceVariant
+                Spacer(Modifier.height(8.dp))
+                BigStat("Music", if (music) "Playing" else "Idle", valueColor = musicColor)
+            }
+        }
+    }
+}
+
 // -- Cameras -----------------------------------------------------------------
 
 @Composable
