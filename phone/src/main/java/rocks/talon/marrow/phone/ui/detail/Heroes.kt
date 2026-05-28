@@ -1132,25 +1132,42 @@ fun EnvironmentHero(vm: MarrowViewModel, section: Section, isPhone: Boolean) {
     }
 }
 
-// -- Activity (step counter) ------------------------------------------------
+// -- Activity (step counter + compass bearing) --------------------------------
+
+/**
+ * Converts an azimuth in degrees (0–360) to a 16-point compass abbreviation.
+ * Sectors are 22.5° wide; the function rounds to the nearest cardinal/intercardinal point.
+ *
+ * Examples: 0°→"N", 45°→"NE", 315°→"NW", 180°→"S", 247.5°→"WSW"
+ */
+private fun degreesToCompassPoint(deg: Float): String {
+    val points = arrayOf(
+        "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+        "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
+    )
+    return points[((deg / 22.5f) + 0.5f).toInt() % 16]
+}
 
 /**
  * Hero for the Activity section — shows steps accumulated since the last device
- * reboot from [MarrowViewModel.stepCount] ([Sensor.TYPE_STEP_COUNTER]).
+ * reboot from [MarrowViewModel.stepCount] ([Sensor.TYPE_STEP_COUNTER]) and live
+ * compass bearing from [MarrowViewModel.compassBearingDeg] ([Sensor.TYPE_ROTATION_VECTOR]).
  *
  * The step counter is a hardware accumulator, not a daily step count: it starts
  * at an arbitrary baseline on boot and increases monotonically. The displayed
  * value resets on reboot. Thousand-separator formatting ("12,345") makes large
  * step counts readable at a glance.
  *
- * The stat is hidden when the sensor has not yet fired (null state) — sensors
- * can take a few seconds to deliver the first event on startup.
+ * The compass bearing is derived from the rotation vector sensor (accelerometer +
+ * magnetometer + gyroscope fusion) and displayed as a 16-point abbreviation + numeric
+ * degrees (e.g. "NW 315°"). Both stats are hidden when the sensor has not yet fired.
  *
  * Phone only. Zero permissions required (API 29+).
  */
 @Composable
 fun ActivityHero(vm: MarrowViewModel, section: Section) {
     val stepCount by vm.stepCount.collectAsState()
+    val compassBearingDeg by vm.compassBearingDeg.collectAsState()
 
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
@@ -1163,7 +1180,7 @@ fun ActivityHero(vm: MarrowViewModel, section: Section) {
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     )
                     Text(
-                        "Step counter · since last reboot",
+                        "Steps · heading · since last reboot",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1173,6 +1190,11 @@ fun ActivityHero(vm: MarrowViewModel, section: Section) {
             if (steps != null) {
                 Spacer(Modifier.height(12.dp))
                 BigStat("Steps", "%,d".format(steps))
+            }
+            val bearing = compassBearingDeg
+            if (bearing != null) {
+                Spacer(Modifier.height(8.dp))
+                BigStat("Bearing", "${degreesToCompassPoint(bearing)} ${bearing.roundToInt()}°")
             }
         }
     }
