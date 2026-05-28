@@ -31,7 +31,7 @@ import rocks.talon.marrow.shared.LiveStats
  *
  * - **Snapshot** for the phone (full collector dump) and watch (cached/live).
  * - **Live stats** (battery / memory / cpu / storage / cpu-temp / network / disk I/O / uptime / gpu)
- *   polled every refresh interval — used by the Device tab's hero/strip and per-section heroes.
+ *   polled every refresh interval — used by the Device tab’s hero/strip and per-section heroes.
  * - **Settings** stream from DataStore so the theme/interval react to changes.
  */
 class MarrowViewModel(app: Application) : AndroidViewModel(app) {
@@ -181,6 +181,17 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _stepCount = MutableStateFlow<Long?>(null)
     val stepCount: StateFlow<Long?> = _stepCount.asStateFlow()
 
+    /**
+     * Current screen refresh rate in Hz from [android.view.Display.getRefreshRate].
+     * null in non-UI contexts or when [Context.getDisplay] returns null (service env).
+     * On LTPO / VRR displays (Pixel 8 Pro, Samsung Galaxy S24 Ultra) this adapts
+     * dynamically — 120 Hz under load, as low as 1 Hz when the screen is static.
+     *
+     * No permissions required.
+     */
+    private val _screenRefreshRateHz = MutableStateFlow<Float?>(null)
+    val screenRefreshRateHz: StateFlow<Float?> = _screenRefreshRateHz.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -297,6 +308,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 // Network traffic totals since boot — TrafficStats, polled, no permissions needed
                 _totalRxBytes.value = LiveStats.totalRxBytes()
                 _totalTxBytes.value = LiveStats.totalTxBytes()
+                // Screen refresh rate — Display.getRefreshRate(), no permissions needed
+                _screenRefreshRateHz.value = LiveStats.screenRefreshRateHz(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }

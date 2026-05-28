@@ -892,6 +892,7 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
     val screenBrightnessPct by vm.screenBrightnessPct.collectAsState()
     val screenBrightnessAuto by vm.screenBrightnessAuto.collectAsState()
     val lightLux by vm.lightLux.collectAsState()
+    val screenRefreshRateHz by vm.screenRefreshRateHz.collectAsState()
     val res = section.rows.firstOrNull { it.label == "Resolution" }?.value ?: "—"
     val dpi = section.rows.firstOrNull { it.label == "Density" }?.value ?: "—"
     val refresh = section.rows.firstOrNull { it.label == "Refresh rate" }?.value ?: "—"
@@ -954,6 +955,11 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
             if (lux != null) {
                 Spacer(Modifier.height(4.dp))
                 BigStat("Ambient", "${lux.roundToInt()} lux")
+            }
+            val rateHz = screenRefreshRateHz
+            if (rateHz != null) {
+                Spacer(Modifier.height(4.dp))
+                BigStat("Refresh", "%.0f Hz".format(rateHz))
             }
         }
     }
