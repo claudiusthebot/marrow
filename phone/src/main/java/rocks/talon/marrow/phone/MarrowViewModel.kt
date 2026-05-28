@@ -204,6 +204,15 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _compassBearingDeg = MutableStateFlow<Float?>(null)
     val compassBearingDeg: StateFlow<Float?> = _compassBearingDeg.asStateFlow()
 
+    /** Device tilt angle in degrees from [Sensor.TYPE_GRAVITY].
+     * Tilt = acos(gz / magnitude) × 180/π, where (gx, gy, gz) is the gravity vector.
+     * 0° = device lying flat face-up; ~90° = device held upright in portrait orientation.
+     * null before first sensor event or on devices without the sensor.
+     * Zero permissions required.
+     */
+    private val _tiltAngleDeg = MutableStateFlow<Float?>(null)
+    val tiltAngleDeg: StateFlow<Float?> = _tiltAngleDeg.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -217,6 +226,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private var ambientTempSensorListener: SensorEventListener? = null
     private var stepCounterListener: SensorEventListener? = null
     private var rotationVectorListener: SensorEventListener? = null
+    private var gravitySensorListener: SensorEventListener? = null
 
     init {
         refreshPhone()
@@ -227,6 +237,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         startAmbientTempSensor()
         startStepCounterSensor()
         startRotationVectorSensor()
+        startGravitySensor()
     }
 
     // -- Operations --------------------------------------------------------------
@@ -465,6 +476,34 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
+    /**
+     * Registers a [SensorEventListener] for [Sensor.TYPE_GRAVITY] using
+     * [SensorManager.SENSOR_DELAY_NORMAL] (~200ms). The gravity sensor reports the
+     * component of the acceleration due to gravity along each axis (x, y, z) in m/s².
+     *
+     * Tilt from vertical = acos(gz / magnitude) × 180/π. When the phone lies flat
+     * face-up gz ≈ 9.81, tilt ≈ 0°. When held upright in portrait mode gz ≈ 0, tilt ≈ 90°.
+     * Stored in [_tiltAngleDeg]. Zero permissions required.
+     */
+    private fun startGravitySensor() {
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_GRAVITY) ?: return
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                val v = event?.values ?: return
+                val gx = v[0]; val gy = v[1]; val gz = v[2]
+                val mag = Math.sqrt((gx * gx + gy * gy + gz * gz).toDouble()).toFloat()
+                if (mag == 0f) return
+                val tilt = Math.toDegrees(Math.acos((gz / mag).coerceIn(-1f, 1f).toDouble())).toFloat()
+                _tiltAngleDeg.value = tilt
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        gravitySensorListener = listener
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
     override fun onCleared() {
         liveJob?.cancel()
         lightSensorListener?.let { sensorManager?.unregisterListener(it) }
@@ -474,6 +513,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         ambientTempSensorListener?.let { sm?.unregisterListener(it) }
         stepCounterListener?.let { sm?.unregisterListener(it) }
         rotationVectorListener?.let { sm?.unregisterListener(it) }
+        gravitySensorListener?.let { sm?.unregisterListener(it) }
         super.onCleared()
     }
 }
