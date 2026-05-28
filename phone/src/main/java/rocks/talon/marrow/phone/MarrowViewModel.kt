@@ -239,6 +239,26 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _linearAccelMagnitude = MutableStateFlow<Float?>(null)
     val linearAccelMagnitude: StateFlow<Float?> = _linearAccelMagnitude.asStateFlow()
 
+    /**
+     * Magnetic field strength magnitude in µT from [Sensor.TYPE_MAGNETIC_FIELD].
+     * magnitude = √(Bx² + By² + Bz²), where (Bx, By, Bz) are the raw magnetometer
+     * components in microtesla.
+     *
+     * Earth's ambient geomagnetic field is typically 25–65 µT depending on location.
+     * Anomalies from nearby power cables, electric motors, speaker magnets, or strong
+     * permanent magnets deviate significantly from this range.
+     *
+     * Distinct from the compass bearing ([_compassBearingDeg] / [Sensor.TYPE_ROTATION_VECTOR]):
+     * that sensor fuses accelerometer + magnetometer + gyroscope into a heading angle;
+     * this is the raw magnetometer magnitude — a physical field-strength measurement
+     * rather than a directional reading.
+     *
+     * null before the first sensor event fires. Present on all modern Android phones.
+     * Zero permissions required.
+     */
+    private val _magneticFieldUt = MutableStateFlow<Float?>(null)
+    val magneticFieldUt: StateFlow<Float?> = _magneticFieldUt.asStateFlow()
+
     // -- Audio -------------------------------------------------------------------
 
     /** Current ringer mode from [android.media.AudioManager]. null when unavailable.
@@ -274,6 +294,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private var gravitySensorListener: SensorEventListener? = null
     private var gyroscopeListener: SensorEventListener? = null
     private var linearAccelListener: SensorEventListener? = null
+    private var magnetometerListener: SensorEventListener? = null
 
     init {
         refreshPhone()
@@ -287,6 +308,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         startGravitySensor()
         startGyroscopeSensor()
         startLinearAccelSensor()
+        startMagnetometerSensor()
     }
 
     // -- Operations --------------------------------------------------------------
@@ -608,6 +630,33 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
+    /**
+     * Registers a [SensorEventListener] for [Sensor.TYPE_MAGNETIC_FIELD] using
+     * [SensorManager.SENSOR_DELAY_NORMAL] (~200ms). Reports the raw geomagnetic
+     * field vector (Bx, By, Bz) in microtesla. The magnitude √(Bx²+By²+Bz²) is
+     * stored in [_magneticFieldUt].
+     *
+     * Earth's ambient field is ~25–65 µT; anomalies from cables, motors, or magnets
+     * deviate significantly. Present on all modern Android phones.
+     * Zero permissions required.
+     */
+    private fun startMagnetometerSensor() {
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) ?: return
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                val v = event?.values ?: return
+                val bx = v[0]; val by = v[1]; val bz = v[2]
+                val mag = Math.sqrt((bx * bx + by * by + bz * bz).toDouble()).toFloat()
+                _magneticFieldUt.value = mag
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        magnetometerListener = listener
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
     override fun onCleared() {
         liveJob?.cancel()
         lightSensorListener?.let { sensorManager?.unregisterListener(it) }
@@ -620,6 +669,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         gravitySensorListener?.let { sm?.unregisterListener(it) }
         gyroscopeListener?.let { sm?.unregisterListener(it) }
         linearAccelListener?.let { sm?.unregisterListener(it) }
+        magnetometerListener?.let { sm?.unregisterListener(it) }
         super.onCleared()
     }
 }
