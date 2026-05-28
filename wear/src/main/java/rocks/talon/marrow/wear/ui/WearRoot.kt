@@ -64,6 +64,13 @@ import rocks.talon.marrow.wear.ui.theme.MarrowWearTheme
 /**
  * Root composable for the watch app.
  *
+ * v0.15.0 additions over v0.4.0:
+ *   - StepsCard — shows cumulative steps since last reboot on the home list
+ *     screen, below LiveStatsRow. Driven by WearViewModel.stepCount StateFlow
+ *     (SensorEventListener on TYPE_STEP_COUNTER registered in ViewModel init).
+ *     Appears once the sensor fires (~1 s on hardware; absent on emulators).
+ *     Zero new permissions.
+ *
  * v0.4.0 additions over v0.2.0:
  *   - LiveStatsRow — compact battery% + RAM% card on the home list screen,
  *     visible at a glance without entering a detail screen.
@@ -113,6 +120,7 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
     val refreshing by vm.refreshing.collectAsState()
     val battery by vm.battery.collectAsState()
     val memory by vm.memory.collectAsState()
+    val stepCount by vm.stepCount.collectAsState()
 
     val listState = rememberTransformingLazyColumnState()
     val transformSpec = rememberTransformationSpec()
@@ -168,6 +176,21 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
                     LiveStatsRow(
                         battery = battery,
                         memory = memory,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .transformedHeight(this, transformSpec),
+                        transformation = SurfaceTransformation(transformSpec),
+                    )
+                }
+            }
+
+            // Steps since boot — visible once the step-counter sensor has fired
+            // at least once (typically < 1 s on hardware; absent on emulators and
+            // watches without a pedometer sensor).
+            if (!isLoading && stepCount != null) {
+                item {
+                    StepsCard(
+                        stepCount = stepCount!!,
                         modifier = Modifier
                             .fillMaxWidth()
                             .transformedHeight(this, transformSpec),
@@ -285,6 +308,55 @@ private fun LiveStatsRow(
                 )
                 Text(
                     text = "RAM",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Compact steps card for the home screen.
+ *
+ * Shows cumulative step count since last device reboot, driven by
+ * WearViewModel.stepCount (SensorEventListener on TYPE_STEP_COUNTER).
+ * Rendered as: [Activity icon]  [12,345]  steps since boot.
+ *
+ * Only added to the list when the sensor has fired at least once — the
+ * card is absent on emulators and watches without a pedometer.
+ */
+@Composable
+private fun StepsCard(
+    stepCount: Long,
+    modifier: Modifier,
+    transformation: SurfaceTransformation,
+) {
+    Card(
+        onClick = {},
+        modifier = modifier,
+        transformation = transformation,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = WearIcons.Activity,
+                contentDescription = "Steps",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Column {
+                Text(
+                    text = "%,d".format(stepCount),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = "steps since boot",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -589,7 +661,7 @@ private fun BatteryArcCard(
             // Temperature below the gauge when the sensor is readable
             if (battery.temperatureC >= 0f) {
                 Text(
-                    text = "${"%.1f".format(battery.temperatureC)}°C",
+                    text = "${"%".format(battery.temperatureC)}°C",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -145,6 +145,27 @@ object WearIcons {
             .s("M10 18.5 H14")
     }
 
+    /**
+     * Activity: a stylised walking person — filled circle head + stride limbs.
+     * Represents motion/fitness/step-counter data. Mirrors phone MarrowIcons.Activity.
+     * Paths use only uppercase (absolute) commands for compatibility with
+     * WearIcons' addPathString() parser.
+     */
+    val Activity = marrow("Activity") {
+        // Head: circle centred at (12, 5) with r=2
+        s("M12 3 A2 2 0 1 0 12 7 A2 2 0 1 0 12 3 Z", fill = true)
+            // Torso
+            .s("M12 9 L10 14")
+            // Left leg (stride forward)
+            .s("M10 14 L8 20")
+            // Right leg (stride back)
+            .s("M10 14 L13 19")
+            // Left arm (swing forward)
+            .s("M12 10 L9 13")
+            // Right arm (swing back)
+            .s("M12 10 L15 12")
+    }
+
     fun forSection(id: String): ImageVector = when (id) {
         Sections.DEVICE -> Device
         Sections.SYSTEM -> System
@@ -159,6 +180,7 @@ object WearIcons {
         Sections.BUILD_FLAGS -> BuildFlags
         Sections.SOFTWARE -> Software
         Sections.GPU -> Gpu
+        Sections.ACTIVITY -> Activity
         else -> Device
     }
 }
