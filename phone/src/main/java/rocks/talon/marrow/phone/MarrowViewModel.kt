@@ -223,6 +223,22 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _gyroMagnitude = MutableStateFlow<Float?>(null)
     val gyroMagnitude: StateFlow<Float?> = _gyroMagnitude.asStateFlow()
 
+    /**
+     * Linear acceleration magnitude in m/s² from [Sensor.TYPE_LINEAR_ACCELERATION].
+     * [Sensor.TYPE_LINEAR_ACCELERATION] is a composite sensor — Android subtracts the
+     * gravity vector from the raw accelerometer reading, leaving only motion-induced
+     * acceleration. Near 0 m/s² when the device is at rest; spikes when the device
+     * is jolted, shaken, tapped, or dropped.
+     *
+     * magnitude = √(ax² + ay² + az²), where (ax, ay, az) are the linear acceleration
+     * components in m/s².
+     *
+     * null before the first sensor event fires or on devices without an accelerometer
+     * (extremely rare — all modern Android phones have one). Zero permissions required.
+     */
+    private val _linearAccelMagnitude = MutableStateFlow<Float?>(null)
+    val linearAccelMagnitude: StateFlow<Float?> = _linearAccelMagnitude.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -238,6 +254,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private var rotationVectorListener: SensorEventListener? = null
     private var gravitySensorListener: SensorEventListener? = null
     private var gyroscopeListener: SensorEventListener? = null
+    private var linearAccelListener: SensorEventListener? = null
 
     init {
         refreshPhone()
@@ -250,6 +267,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         startRotationVectorSensor()
         startGravitySensor()
         startGyroscopeSensor()
+        startLinearAccelSensor()
     }
 
     // -- Operations --------------------------------------------------------------
@@ -540,6 +558,33 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
+    /**
+     * Registers a [SensorEventListener] for [Sensor.TYPE_LINEAR_ACCELERATION] using
+     * [SensorManager.SENSOR_DELAY_NORMAL] (~200ms). [Sensor.TYPE_LINEAR_ACCELERATION] is a
+     * composite sensor — Android subtracts the gravity vector from the raw accelerometer,
+     * leaving only motion-induced acceleration. Near 0 m/s² at rest; spikes on jolts, taps,
+     * drops, or walking.
+     *
+     * magnitude = √(ax² + ay² + az²). Stored in [_linearAccelMagnitude].
+     * Zero permissions required. Silent no-op on devices without an accelerometer (extremely rare).
+     */
+    private fun startLinearAccelSensor() {
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION) ?: return
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                val v = event?.values ?: return
+                val ax = v[0]; val ay = v[1]; val az = v[2]
+                val mag = Math.sqrt((ax * ax + ay * ay + az * az).toDouble()).toFloat()
+                _linearAccelMagnitude.value = mag
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        linearAccelListener = listener
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
     override fun onCleared() {
         liveJob?.cancel()
         lightSensorListener?.let { sensorManager?.unregisterListener(it) }
@@ -551,6 +596,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         rotationVectorListener?.let { sm?.unregisterListener(it) }
         gravitySensorListener?.let { sm?.unregisterListener(it) }
         gyroscopeListener?.let { sm?.unregisterListener(it) }
+        linearAccelListener?.let { sm?.unregisterListener(it) }
         super.onCleared()
     }
 }

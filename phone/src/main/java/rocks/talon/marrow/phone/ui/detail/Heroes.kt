@@ -1156,8 +1156,11 @@ private fun degreesToCompassPoint(deg: Float): String {
 
 /**
  * Hero for the Activity section — shows steps accumulated since the last device
- * reboot from [MarrowViewModel.stepCount] ([Sensor.TYPE_STEP_COUNTER]) and live
- * compass bearing from [MarrowViewModel.compassBearingDeg] ([Sensor.TYPE_ROTATION_VECTOR]).
+ * reboot from [MarrowViewModel.stepCount] ([Sensor.TYPE_STEP_COUNTER]), live
+ * compass bearing from [MarrowViewModel.compassBearingDeg] ([Sensor.TYPE_ROTATION_VECTOR]),
+ * gyroscope rotation rate from [MarrowViewModel.gyroMagnitude] ([Sensor.TYPE_GYROSCOPE]),
+ * and linear acceleration magnitude from [MarrowViewModel.linearAccelMagnitude]
+ * ([Sensor.TYPE_LINEAR_ACCELERATION]).
  *
  * The step counter is a hardware accumulator, not a daily step count: it starts
  * at an arbitrary baseline on boot and increases monotonically. The displayed
@@ -1166,15 +1169,19 @@ private fun degreesToCompassPoint(deg: Float): String {
  *
  * The compass bearing is derived from the rotation vector sensor (accelerometer +
  * magnetometer + gyroscope fusion) and displayed as a 16-point abbreviation + numeric
- * degrees (e.g. "NW 315°"). Both stats are hidden when the sensor has not yet fired.
+ * degrees (e.g. "NW 315°").
  *
- * Phone only. Zero permissions required (API 29+).
+ * Linear acceleration (TYPE_LINEAR_ACCELERATION) strips the gravity vector from the
+ * raw accelerometer — near 0 m/s² at rest, spikes on jolts, taps, or drops.
+ *
+ * All stats are hidden when the sensor has not yet fired. Phone only. Zero permissions required (API 29+).
  */
 @Composable
 fun ActivityHero(vm: MarrowViewModel, section: Section) {
     val stepCount by vm.stepCount.collectAsState()
     val compassBearingDeg by vm.compassBearingDeg.collectAsState()
     val gyroMagnitude by vm.gyroMagnitude.collectAsState()
+    val linearAccelMagnitude by vm.linearAccelMagnitude.collectAsState()
 
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
@@ -1187,7 +1194,7 @@ fun ActivityHero(vm: MarrowViewModel, section: Section) {
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     )
                     Text(
-                        "Steps · heading · rotation · since last reboot",
+                        "Steps · heading · rotation · acceleration · since last reboot",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1207,6 +1214,11 @@ fun ActivityHero(vm: MarrowViewModel, section: Section) {
             if (gyro != null) {
                 Spacer(Modifier.height(8.dp))
                 BigStat("Rotation", "%.2f rad/s".format(gyro))
+            }
+            val accel = linearAccelMagnitude
+            if (accel != null) {
+                Spacer(Modifier.height(8.dp))
+                BigStat("Accel", "%.2f m/s²".format(accel))
             }
         }
     }
