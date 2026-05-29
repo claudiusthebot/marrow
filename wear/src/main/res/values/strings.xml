@@ -7,4 +7,6 @@
     <string name="notification_channel_thermal_desc">Alerts when the SoC temperature stays above 80°C for 60+ seconds.</string>
     <string name="notification_thermal_title">Thermal Alert</string>
     <string name="notification_thermal_text">SoC temperature: %1$.0f°C — sustained high heat detected</string>
+    <string name="complication_battery_label">Marrow Battery</string>
+    <string name="complication_memory_label">Marrow RAM</string>
 </resources>

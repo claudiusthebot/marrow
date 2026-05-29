@@ -13,8 +13,8 @@ android {
         applicationId = "rocks.talon.marrow"
         minSdk = 33  // Wear OS 4+; we target Pixel Watch 3 (Wear OS 6).
         targetSdk = 36
-        versionCode = 19
-        versionName = "0.46.0"
+        versionCode = 20
+        versionName = "0.47.0"
     }
 
     buildTypes {
@@ -72,6 +72,13 @@ dependencies {
     // the helper factories — so we add `guava` explicitly. The
     // `-android` flavour avoids the JRE-only dependency on `j2objc-annotations`.
     implementation("com.google.guava:guava:33.4.0-android")
+
+    // Wear OS Complications — data source service API.
+    // Provides SuspendingComplicationDataSourceService, ComplicationData types
+    // (RangedValueComplicationData, ShortTextComplicationData, etc.), and
+    // PlainComplicationText. The -ktx variant adds coroutine support so
+    // onComplicationRequest() is a suspend fun.
+    implementation("androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 

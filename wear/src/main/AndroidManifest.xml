@@ -70,5 +70,41 @@
                 android:name="androidx.wear.tiles.PREVIEW"
                 android:resource="@drawable/tile_stats_preview" />
         </service>
+
+        <!-- Complication: battery level (0–100%) on any compatible watch face.
+             Supports RANGED_VALUE (arc) and SHORT_TEXT. Updated every 5 min. -->
+        <service
+            android:name=".complication.BatteryComplicationDataSourceService"
+            android:label="@string/complication_battery_label"
+            android:exported="true"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_DATA_SOURCE">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="RANGED_VALUE,SHORT_TEXT" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="300" />
+        </service>
+
+        <!-- Complication: RAM usage % on any compatible watch face.
+             Supports RANGED_VALUE (arc) and SHORT_TEXT. Updated every 5 min. -->
+        <service
+            android:name=".complication.MemoryComplicationDataSourceService"
+            android:label="@string/complication_memory_label"
+            android:exported="true"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_DATA_SOURCE">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="RANGED_VALUE,SHORT_TEXT" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="300" />
+        </service>
     </application>
 </manifest>
