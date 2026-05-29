@@ -1,5 +1,7 @@
 package rocks.talon.marrow.wear.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -17,9 +19,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,6 +32,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -63,6 +69,15 @@ import rocks.talon.marrow.wear.ui.theme.MarrowWearTheme
 
 /**
  * Root composable for the watch app.
+ *
+ * v0.45.0 additions over v0.15.0:
+ *   - HeartRateCard — shows live BPM from TYPE_HEART_RATE on the home list screen,
+ *     below StepsCard. Requires BODY_SENSORS permission (first dangerous permission
+ *     in Marrow). On first compose, checks if BODY_SENSORS is granted; if not, the
+ *     card is hidden. When the sensor fires and BPM > 0, the card appears.
+ *     Color-coded: green (60–100 BPM normal), amber (<60 bradycardia), red (>100
+ *     tachycardia). WearViewModel.initHeartRateSensor() is public so it can be
+ *     called again after permission is granted at runtime.
  *
  * v0.15.0 additions over v0.4.0:
  *   - StepsCard — shows cumulative steps since last reboot on the home list
@@ -121,6 +136,22 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
     val battery by vm.battery.collectAsState()
     val memory by vm.memory.collectAsState()
     val stepCount by vm.stepCount.collectAsState()
+    val heartRateBpm by vm.heartRateBpm.collectAsState()
+
+    // Check BODY_SENSORS permission. If not granted, the HR sensor never fires
+    // and heartRateBpm stays null — HeartRateCard simply won't appear. Re-check
+    // when the composable re-enters composition (e.g. after a settings visit).
+    val context = LocalContext.current
+    var bodySensorsGranted by remember {
+        mutableStateOf(
+            context.checkSelfPermission(Manifest.permission.BODY_SENSORS)
+                == PackageManager.PERMISSION_GRANTED,
+        )
+    }
+    // If permission was already granted, ensure the sensor listener is armed.
+    LaunchedEffect(bodySensorsGranted) {
+        if (bodySensorsGranted) vm.initHeartRateSensor()
+    }
 
     val listState = rememberTransformingLazyColumnState()
     val transformSpec = rememberTransformationSpec()
@@ -191,6 +222,21 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
                 item {
                     StepsCard(
                         stepCount = stepCount!!,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .transformedHeight(this, transformSpec),
+                        transformation = SurfaceTransformation(transformSpec),
+                    )
+                }
+            }
+
+            // Heart rate — visible once BODY_SENSORS is granted and the optical
+            // HR sensor has produced at least one valid reading (BPM > 0).
+            // Stays hidden on devices without a heart-rate sensor.
+            if (!isLoading && bodySensorsGranted && heartRateBpm != null) {
+                item {
+                    HeartRateCard(
+                        bpm = heartRateBpm!!,
                         modifier = Modifier
                             .fillMaxWidth()
                             .transformedHeight(this, transformSpec),
@@ -357,6 +403,66 @@ private fun StepsCard(
                 )
                 Text(
                     text = "steps since boot",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Compact heart rate card for the home screen.
+ *
+ * Shows live BPM from TYPE_HEART_RATE, driven by WearViewModel.heartRateBpm
+ * (SensorEventListener registered in WearViewModel.initHeartRateSensor()).
+ * Only shown when BODY_SENSORS is granted and a valid reading exists.
+ *
+ * Color coding:
+ *   - primary (orange)  — 60–100 BPM  (normal resting)
+ *   - tertiary (yellow) — <60 BPM     (bradycardia range)
+ *   - error (red)       — >100 BPM    (tachycardia range)
+ *
+ * Layout: [Heart icon]  [NN BPM]  bpm
+ */
+@Composable
+private fun HeartRateCard(
+    bpm: Float,
+    modifier: Modifier,
+    transformation: SurfaceTransformation,
+) {
+    val bpmInt = bpm.toInt()
+    val bpmColor = when {
+        bpmInt < 60 -> MaterialTheme.colorScheme.tertiary
+        bpmInt > 100 -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+    Card(
+        onClick = {},
+        modifier = modifier,
+        transformation = transformation,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = WearIcons.HeartRate,
+                contentDescription = "Heart rate",
+                tint = bpmColor,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Column {
+                Text(
+                    text = "$bpmInt BPM",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = bpmColor,
+                )
+                Text(
+                    text = "heart rate",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

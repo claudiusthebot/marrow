@@ -11,6 +11,8 @@
     <!-- Required on API 33+ to post notifications. Pre-granted for Wear OS
          on-device apps; kept explicit here for documentation clarity. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Required for TYPE_HEART_RATE sensor access on Wear OS. -->
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
 
     <application
         android:name=".MarrowWearApp"

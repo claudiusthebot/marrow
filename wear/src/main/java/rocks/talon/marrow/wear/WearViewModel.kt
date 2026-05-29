@@ -27,6 +27,14 @@ import rocks.talon.marrow.wear.sync.pingPhone
  * Holds the shared device-info snapshot for every screen in the watch app and
  * the small ping-phone state machine.
  *
+ * v0.45.0 additions:
+ * - Heart rate sensor via SensorEventListener on TYPE_HEART_RATE, registered in
+ *   [initHeartRateSensor] (called from [init]) and unregistered in [onCleared].
+ *   Exposed as [heartRateBpm] StateFlow<Float?>. Requires BODY_SENSORS permission
+ *   (declared in AndroidManifest.xml; runtime permission request delegated to
+ *   MainActivity on first use via Compose permission state). Stays null on devices
+ *   without the sensor or when permission is denied.
+ *
  * v0.15.0 additions:
  * - Step counter via SensorEventListener on TYPE_STEP_COUNTER, registered in
  *   [initStepCounter] (called from [init]) and unregistered in [onCleared].
@@ -82,13 +90,41 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val _stepCount = MutableStateFlow<Long?>(null)
     val stepCount: StateFlow<Long?> = _stepCount.asStateFlow()
 
+    /**
+     * Live heart rate in beats per minute via TYPE_HEART_RATE.
+     *
+     * null until the first sensor event fires or when the BODY_SENSORS
+     * permission has not been granted. Typical latency after grant: 1–3 s
+     * depending on the watch's optical HR sensor warm-up cycle. The sensor
+     * delivers updates at ~1 Hz while the display is on.
+     *
+     * Requires android.permission.BODY_SENSORS — the first dangerous
+     * permission in Marrow. Declared in AndroidManifest.xml; the runtime
+     * grant must be requested from the Compose UI before the reading will
+     * appear (WearRoot requests it on HeartRateCard display).
+     */
+    private val _heartRateBpm = MutableStateFlow<Float?>(null)
+    val heartRateBpm: StateFlow<Float?> = _heartRateBpm.asStateFlow()
+
     /** Retained so we can unregister in [onCleared]. */
     private var stepSensorManager: SensorManager? = null
+    private var heartRateSensorManager: SensorManager? = null
 
     private val stepListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
             if (event.sensor.type == Sensor.TYPE_STEP_COUNTER) {
                 _stepCount.value = event.values[0].toLong()
+            }
+        }
+        override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
+    }
+
+    private val heartRateListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            if (event.sensor.type == Sensor.TYPE_HEART_RATE && event.values.isNotEmpty()) {
+                val bpm = event.values[0]
+                // values[0] == 0 means the sensor has not produced a valid reading yet
+                if (bpm > 0f) _heartRateBpm.value = bpm
             }
         }
         override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
@@ -100,6 +136,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         refresh()
         checkPhoneReachable()
         initStepCounter()
+        initHeartRateSensor()
     }
 
     /**
@@ -112,6 +149,25 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         stepSensorManager = sm
         val sensor = sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) ?: return
         sm.registerListener(stepListener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
+    /**
+     * Register a TYPE_HEART_RATE SensorEventListener.
+     *
+     * The BODY_SENSORS permission is required at runtime on Wear OS 4+ (API 33).
+     * This method silently no-ops if the sensor is absent or the permission has
+     * not been granted yet — the HR card remains hidden until a valid reading
+     * arrives. [WearRoot] requests the permission before this value is checked.
+     *
+     * SENSOR_DELAY_NORMAL (~5 Hz max) is sufficient; HR sensors self-throttle
+     * to ~1 Hz regardless of the requested rate.
+     */
+    fun initHeartRateSensor() {
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        heartRateSensorManager = sm
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_HEART_RATE) ?: return
+        sm.registerListener(heartRateListener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
     fun refresh() {
@@ -173,6 +229,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         liveJob?.cancel()
         stepSensorManager?.unregisterListener(stepListener)
+        heartRateSensorManager?.unregisterListener(heartRateListener)
         super.onCleared()
     }
 

@@ -166,6 +166,16 @@ object WearIcons {
             .s("M12 10 L15 12")
     }
 
+    /**
+     * HeartRate: a classic heart shape — two arcs meeting at a V bottom.
+     * Represents heart rate / pulse sensor data.
+     * Paths use absolute commands for WearIcons parser compatibility.
+     */
+    val HeartRate = marrow("HeartRate") {
+        // Left lobe arc, right lobe arc, meet at bottom point (12, 20)
+        s("M12 20 L4.5 11.5 A4.5 4.5 0 0 1 12 5 A4.5 4.5 0 0 1 19.5 11.5 Z")
+    }
+
     fun forSection(id: String): ImageVector = when (id) {
         Sections.DEVICE -> Device
         Sections.SYSTEM -> System
