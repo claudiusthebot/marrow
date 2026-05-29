@@ -1,6 +1,6 @@
 package rocks.talon.marrow.wear.complication
 
-import android.hardware.BatteryManager
+import android.os.BatteryManager
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType
 import androidx.wear.watchface.complications.data.PlainComplicationText
