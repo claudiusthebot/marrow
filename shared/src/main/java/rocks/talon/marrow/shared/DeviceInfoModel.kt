@@ -51,6 +51,9 @@ object Sections {
     const val ACTIVITY = "activity"
     /** Phone-only audio section: ringer mode, media volume, and music-active status. */
     const val AUDIO = "audio"
+    /** Phone-only location section: GPS/network coordinates, accuracy, speed, bearing.
+     *  Requires ACCESS_FINE_LOCATION runtime permission — shows a prompt card when not granted. */
+    const val LOCATION = "location"
 }
 
 object MarrowPaths {

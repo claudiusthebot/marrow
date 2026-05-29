@@ -290,6 +290,22 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _isMusicActive = MutableStateFlow<Boolean?>(null)
     val isMusicActive: StateFlow<Boolean?> = _isMusicActive.asStateFlow()
 
+    // -- Location ----------------------------------------------------------------
+
+    /**
+     * Most recent [android.location.Location] fix from GPS or network provider.
+     * null until [initLocationUpdates] is called (after ACCESS_FINE_LOCATION is
+     * granted) and at least one fix arrives. Updated via [android.location.LocationListener]
+     * registered with [android.location.LocationManager.GPS_PROVIDER] and
+     * [android.location.LocationManager.NETWORK_PROVIDER] simultaneously — GPS
+     * provides higher accuracy when available; network fills in between GPS fixes.
+     *
+     * Requires ACCESS_FINE_LOCATION runtime permission. Caller must invoke
+     * [initLocationUpdates] after the user grants the permission.
+     */
+    private val _lastLocation = MutableStateFlow<android.location.Location?>(null)
+    val lastLocation: StateFlow<android.location.Location?> = _lastLocation.asStateFlow()
+
     // -- Settings ----------------------------------------------------------------
 
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(
@@ -298,6 +314,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
 
     private var liveJob: Job? = null
     private var sensorManager: SensorManager? = null
+    private var locationManager: android.location.LocationManager? = null
+    private var locationListener: android.location.LocationListener? = null
     private var lightSensorListener: SensorEventListener? = null
     private var pressureSensorListener: SensorEventListener? = null
     private var ambientTempSensorListener: SensorEventListener? = null
@@ -697,8 +715,60 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
+    // -- Location updates --------------------------------------------------------
+
+    /**
+     * Registers [android.location.LocationListener]s for GPS and network providers.
+     *
+     * Must only be called after ACCESS_FINE_LOCATION has been granted at runtime.
+     * Safe to call multiple times — a second call is a no-op if the listener is
+     * already registered (guard: [_lastLocation] listener exists check skipped;
+     * LocationManager internally deduplicates same-listener registrations).
+     *
+     * Update cadence: minimum 3 seconds / 0 metres. Both providers are registered
+     * simultaneously — GPS fires accurate fixes when the device has satellite lock;
+     * the network provider fills in between GPS updates.
+     *
+     * Call from a LaunchedEffect after the permission dialog returns granted,
+     * identical to the [initHeartRateSensor] pattern in WearViewModel.
+     */
+    fun initLocationUpdates() {
+        val ctx = getApplication<Application>()
+        if (ctx.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
+            != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) return
+        val lm = ctx.getSystemService(Context.LOCATION_SERVICE)
+            as? android.location.LocationManager ?: return
+        locationManager = lm
+        val listener = android.location.LocationListener { loc ->
+            // Prefer the most accurate fix: keep incoming if we have nothing,
+            // or if it is more accurate than the cached fix.
+            val prev = _lastLocation.value
+            if (prev == null || loc.accuracy <= prev.accuracy) {
+                _lastLocation.value = loc
+            }
+        }
+        locationListener = listener
+        // Register GPS first (highest accuracy), then network (fills gaps).
+        runCatching {
+            lm.requestLocationUpdates(
+                android.location.LocationManager.GPS_PROVIDER,
+                3_000L, 0f, listener,
+                android.os.Looper.getMainLooper(),
+            )
+        }
+        runCatching {
+            lm.requestLocationUpdates(
+                android.location.LocationManager.NETWORK_PROVIDER,
+                3_000L, 0f, listener,
+                android.os.Looper.getMainLooper(),
+            )
+        }
+    }
+
     override fun onCleared() {
         liveJob?.cancel()
+        locationListener?.let { locationManager?.removeUpdates(it) }
         lightSensorListener?.let { sensorManager?.unregisterListener(it) }
         val sm = getApplication<Application>()
             .getSystemService(Context.SENSOR_SERVICE) as? SensorManager

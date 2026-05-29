@@ -272,6 +272,18 @@ object MarrowIcons {
             .stroke("M14.5 7 a5.5 5.5 0 0 1 0 10")
     }
 
+    /**
+     * Location pin — teardrop pointing downward with a small circle at the top-centre.
+     * Standard map marker shape: upper body is a circular dome, lower body converges
+     * to a point representing the pinned coordinate. Inner circle marks the exact point.
+     */
+    val Location: ImageVector = marrow("Location") {
+        // Outer pin (teardrop: circle top → converging sides → sharp bottom point)
+        stroke("M12 2 C7.6 2 4 5.6 4 10 C4 15.2 12 22 12 22 C12 22 20 15.2 20 10 C20 5.6 16.4 2 12 2 Z")
+        // Inner circle (centre of the circular dome at y=9)
+        stroke("M10 9 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 Z")
+    }
+
     /** Brand mark — small "M" tilted, used in the wordmark. */
     val Wordmark: ImageVector = marrow("Wordmark") {
         stroke("M4 19 V5 L12 13 L20 5 V19", width = 2.25f)
@@ -302,6 +314,7 @@ object MarrowIcons {
         Sections.GPU -> Gpu
         Sections.ACTIVITY -> Activity
         Sections.AUDIO -> Audio
+        Sections.LOCATION -> Location
         else -> Device
     }
 }
