@@ -27,6 +27,12 @@ import rocks.talon.marrow.wear.sync.pingPhone
  * Holds the shared device-info snapshot for every screen in the watch app and
  * the small ping-phone state machine.
  *
+ * v0.50.0 additions:
+ * - Cellular stats via TelephonyManager. [cellularInfo] seeds in [refresh] and
+ *   polls in [startLive]. Requires READ_BASIC_PHONE_STATE (normal permission,
+ *   manifest-only). Returns null on WiFi-only watches or when telephony is absent.
+ *   [CellularCard] on the home list shows carrier name, network type, signal bars.
+ *
  * v0.45.0 additions:
  * - Heart rate sensor via SensorEventListener on TYPE_HEART_RATE, registered in
  *   [initHeartRateSensor] (called from [init]) and unregistered in [onCleared].
@@ -106,6 +112,20 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val _heartRateBpm = MutableStateFlow<Float?>(null)
     val heartRateBpm: StateFlow<Float?> = _heartRateBpm.asStateFlow()
 
+    /**
+     * Live cellular/telephony snapshot — carrier name, network type (5G/LTE/…),
+     * signal level (0–4), and roaming flag.
+     *
+     * null on watches without telephony hardware (FEATURE_TELEPHONY absent),
+     * in airplane mode, or on the rare case READ_BASIC_PHONE_STATE is missing.
+     * Seeded in [refresh] and updated every 10 s in [startLive].
+     *
+     * READ_BASIC_PHONE_STATE is a normal (manifest-only) permission on API 33+;
+     * no runtime dialog is shown.
+     */
+    private val _cellular = MutableStateFlow<LiveStats.Cellular?>(null)
+    val cellular: StateFlow<LiveStats.Cellular?> = _cellular.asStateFlow()
+
     /** Retained so we can unregister in [onCleared]. */
     private var stepSensorManager: SensorManager? = null
     private var heartRateSensorManager: SensorManager? = null
@@ -181,6 +201,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // Also seed live stats from this collection
             _battery.value = withContext(Dispatchers.IO) { LiveStats.battery(getApplication()) }
             _memory.value = withContext(Dispatchers.IO) { LiveStats.memory(getApplication()) }
+            _cellular.value = withContext(Dispatchers.IO) { LiveStats.cellularInfo(getApplication()) }
             _refreshing.value = false
             checkPhoneReachable()
         }
@@ -195,6 +216,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 _memory.value = LiveStats.memory(getApplication())
                 _cpuCores.value = LiveStats.cpuCores()
                 _gpu.value = LiveStats.gpu()
+                _cellular.value = LiveStats.cellularInfo(getApplication())
                 delay(10_000L)
             }
         }

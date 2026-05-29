@@ -72,6 +72,14 @@ import rocks.talon.marrow.wear.ui.theme.MarrowWearTheme
 /**
  * Root composable for the watch app.
  *
+ * v0.50.0 additions over v0.46.0:
+ *   - CellularCard — shows carrier name, network type badge (5G/LTE/…), and
+ *     signal bars on the home list screen when telephony hardware is present.
+ *     Driven by WearViewModel.cellular StateFlow (polled in startLive + seeded
+ *     in refresh). Uses READ_BASIC_PHONE_STATE (normal permission). Absent on
+ *     WiFi-only watches or in airplane mode. Color-coded: primary for 5G,
+ *     tertiary for LTE, onSurfaceVariant for 3G/2G/unknown.
+ *
  * v0.46.0 additions over v0.45.0:
  *   - HeartRatePermissionCard — shown when BODY_SENSORS is not yet granted.
  *     Tapping launches ActivityResultContracts.RequestPermission. Once granted,
@@ -145,6 +153,7 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
     val memory by vm.memory.collectAsState()
     val stepCount by vm.stepCount.collectAsState()
     val heartRateBpm by vm.heartRateBpm.collectAsState()
+    val cellular by vm.cellular.collectAsState()
 
     // Check BODY_SENSORS permission. If not granted, the HR sensor never fires
     // and heartRateBpm stays null — HeartRatePermissionCard is shown instead.
@@ -268,6 +277,20 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
                 item {
                     HeartRateCard(
                         bpm = heartRateBpm!!,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .transformedHeight(this, transformSpec),
+                        transformation = SurfaceTransformation(transformSpec),
+                    )
+                }
+            }
+
+            // Cellular at-a-glance — carrier name + network type + signal bars.
+            // Only shown when telephony hardware is present (null on WiFi-only watches).
+            if (!isLoading && cellular != null) {
+                item {
+                    CellularCard(
+                        cellular = cellular!!,
                         modifier = Modifier
                             .fillMaxWidth()
                             .transformedHeight(this, transformSpec),
@@ -550,6 +573,91 @@ private fun HeartRatePermissionCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Compact cellular card for the home screen.
+ *
+ * Shows carrier name, network generation badge (5G/LTE/3G/2G), and signal
+ * strength bars derived from WearViewModel.cellular (polled via startLive).
+ *
+ * Color coding by generation:
+ *   primary (orange)         — 5G
+ *   tertiary (golden yellow) — LTE
+ *   onSurfaceVariant (grey)  — 3G, 2G, Wi-Fi Call, unknown
+ *
+ * Layout: [Cellular icon]  [Carrier name]
+ *                          [Type badge]  [●●●○ bars]
+ *
+ * Only rendered when WearViewModel.cellular is non-null (telephony hardware
+ * present and not in airplane mode). Absent on WiFi-only watches.
+ */
+@Composable
+private fun CellularCard(
+    cellular: LiveStats.Cellular,
+    modifier: Modifier,
+    transformation: SurfaceTransformation,
+) {
+    val netType = cellular.networkTypeName
+    val netColor = when (netType) {
+        "5G"        -> MaterialTheme.colorScheme.primary
+        "LTE"       -> MaterialTheme.colorScheme.tertiary
+        else        -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val signalBars = cellular.signalLevel ?: 0
+    val signalStr = "●".repeat(signalBars) +
+        "○".repeat((4 - signalBars).coerceAtLeast(0))
+
+    Card(
+        onClick = {},
+        modifier = modifier,
+        transformation = transformation,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = WearIcons.Cellular,
+                contentDescription = "Cellular",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Column {
+                Text(
+                    text = cellular.operatorName ?: "No carrier",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (netType != null) {
+                        Text(
+                            text = netType,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = netColor,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text(
+                        text = signalStr,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (cellular.isRoaming) {
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "R",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
             }
         }
     }
