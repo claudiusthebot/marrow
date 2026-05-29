@@ -513,7 +513,6 @@ object DeviceInfoCollector {
         val simState = when (tm.simState) {
             TelephonyManager.SIM_STATE_READY           -> "Ready"
             TelephonyManager.SIM_STATE_ABSENT          -> "Absent"
-            TelephonyManager.SIM_STATE_LOCKED          -> "Locked"
             TelephonyManager.SIM_STATE_PIN_REQUIRED    -> "PIN Required"
             TelephonyManager.SIM_STATE_PUK_REQUIRED    -> "PUK Required"
             TelephonyManager.SIM_STATE_NETWORK_LOCKED  -> "Network Locked"

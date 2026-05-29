@@ -807,7 +807,7 @@ object LiveStats {
      *                        the radio is unregistered, in airplane mode, or the SIM is absent.
      * @param simOperatorName SIM service provider name from the carrier file on the SIM card.
      *                        May differ from [operatorName] when roaming.
-     * @param simState        Human-readable SIM state: "Ready", "Absent", "Locked", "PIN Required",
+     * @param simState        Human-readable SIM state: "Ready", "Absent", "PIN Required",
      *                        "PUK Required", "Network Locked", "I/O Error", "Restricted", or "Unknown".
      * @param networkTypeName Generation label of the active data network: "5G", "LTE", "3G", "2G",
      *                        "Wi-Fi Call", or null when the type is unknown or unavailable.
@@ -848,7 +848,6 @@ object LiveStats {
         val simState = when (tm.simState) {
             android.telephony.TelephonyManager.SIM_STATE_READY           -> "Ready"
             android.telephony.TelephonyManager.SIM_STATE_ABSENT          -> "Absent"
-            android.telephony.TelephonyManager.SIM_STATE_LOCKED          -> "Locked"
             android.telephony.TelephonyManager.SIM_STATE_PIN_REQUIRED    -> "PIN Required"
             android.telephony.TelephonyManager.SIM_STATE_PUK_REQUIRED    -> "PUK Required"
             android.telephony.TelephonyManager.SIM_STATE_NETWORK_LOCKED  -> "Network Locked"
