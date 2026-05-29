@@ -284,6 +284,22 @@ object MarrowIcons {
         stroke("M10 9 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 Z")
     }
 
+    /**
+     * Cellular signal bars — four vertical bars of increasing height (left=low, right=full)
+     * filled solid. Visually identical to the signal-strength indicator shown in Android
+     * system status bars. Represents telephony/cellular-network data.
+     */
+    val Cellular: ImageVector = marrow("Cellular") {
+        // Bar 1 (leftmost, shortest — height 4)
+        fill("M2 17 H5 V21 H2 Z")
+        // Bar 2 (height 8)
+        fill("M7 13 H10 V21 H7 Z")
+        // Bar 3 (height 13)
+        fill("M12 8 H15 V21 H12 Z")
+        // Bar 4 (rightmost, tallest — height 18)
+        fill("M17 3 H20 V21 H17 Z")
+    }
+
     /** Brand mark — small "M" tilted, used in the wordmark. */
     val Wordmark: ImageVector = marrow("Wordmark") {
         stroke("M4 19 V5 L12 13 L20 5 V19", width = 2.25f)
@@ -315,6 +331,7 @@ object MarrowIcons {
         Sections.ACTIVITY -> Activity
         Sections.AUDIO -> Audio
         Sections.LOCATION -> Location
+        Sections.CELLULAR -> Cellular
         else -> Device
     }
 }

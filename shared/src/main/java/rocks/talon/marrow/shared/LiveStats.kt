@@ -795,6 +795,103 @@ object LiveStats {
         else                    -> "$bytes B"
     }
 
+    // -- Cellular ----------------------------------------------------------------
+
+    /**
+     * Live cellular/telephony snapshot. Fields that require [android.Manifest.permission.READ_BASIC_PHONE_STATE]
+     * (normal permission, API 33+) or [android.Manifest.permission.READ_PHONE_STATE] (dangerous) are
+     * wrapped in [runCatching] and fall back to `null` when the permission is absent or the device
+     * does not support telephony.
+     *
+     * @param operatorName    Registered network operator display name (e.g. "Vodafone IE"). Null when
+     *                        the radio is unregistered, in airplane mode, or the SIM is absent.
+     * @param simOperatorName SIM service provider name from the carrier file on the SIM card.
+     *                        May differ from [operatorName] when roaming.
+     * @param simState        Human-readable SIM state: "Ready", "Absent", "PIN Required",
+     *                        "PUK Required", "Network Locked", "I/O Error", "Restricted", or "Unknown".
+     * @param networkTypeName Generation label of the active data network: "5G", "LTE", "3G", "2G",
+     *                        "Wi-Fi Call", or null when the type is unknown or unavailable.
+     * @param signalLevel     Signal strength bar count: 0 (none) – 4 (excellent). Derived from
+     *                        [android.telephony.SignalStrength.getLevel]. Null when unavailable.
+     * @param isRoaming       True when the device is using a network other than its home network.
+     */
+    data class Cellular(
+        val operatorName: String?,
+        val simOperatorName: String?,
+        val simState: String,
+        val networkTypeName: String?,
+        val signalLevel: Int?,
+        val isRoaming: Boolean,
+    )
+
+    /**
+     * Returns a [Cellular] snapshot from [android.telephony.TelephonyManager].
+     *
+     * Zero-permission fields are always populated. Fields requiring
+     * [android.Manifest.permission.READ_BASIC_PHONE_STATE] (API 33+ normal permission)
+     * fall back to null gracefully on API < 33 or when the permission is missing.
+     * Always safe — every access is wrapped in [runCatching].
+     *
+     * Returns null when the device has no telephony hardware
+     * ([android.content.pm.PackageManager.FEATURE_TELEPHONY] absent).
+     */
+    fun cellularInfo(context: Context): Cellular? = runCatching {
+        val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
+            ?: return@runCatching null
+        if (!context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEPHONY)) {
+            return@runCatching null
+        }
+
+        // Zero-permission fields
+        val operatorName = tm.networkOperatorName.takeIf { it.isNotBlank() }
+        val simOperatorName = tm.simOperatorName.takeIf { it.isNotBlank() }
+        val simState = when (tm.simState) {
+            android.telephony.TelephonyManager.SIM_STATE_READY           -> "Ready"
+            android.telephony.TelephonyManager.SIM_STATE_ABSENT          -> "Absent"
+            android.telephony.TelephonyManager.SIM_STATE_PIN_REQUIRED    -> "PIN Required"
+            android.telephony.TelephonyManager.SIM_STATE_PUK_REQUIRED    -> "PUK Required"
+            android.telephony.TelephonyManager.SIM_STATE_NETWORK_LOCKED  -> "Network Locked"
+            android.telephony.TelephonyManager.SIM_STATE_CARD_IO_ERROR   -> "I/O Error"
+            android.telephony.TelephonyManager.SIM_STATE_CARD_RESTRICTED -> "Restricted"
+            else                                                          -> "Unknown"
+        }
+        val isRoaming = tm.isNetworkRoaming
+
+        // READ_BASIC_PHONE_STATE (normal, API 33+) — network type + signal level
+        // runCatching handles SecurityException on API < 33 without READ_PHONE_STATE
+        val networkTypeName = runCatching {
+            cellularNetworkTypeName(tm.dataNetworkType)
+        }.getOrNull()
+        val signalLevel = runCatching {
+            tm.signalStrength?.level?.takeIf { it in 0..4 }
+        }.getOrNull()
+
+        Cellular(operatorName, simOperatorName, simState, networkTypeName, signalLevel, isRoaming)
+    }.getOrNull()
+
+    /** Maps a [android.telephony.TelephonyManager.getDataNetworkType] constant to a
+     *  generation label. Returns null for unknown / unavailable. */
+    private fun cellularNetworkTypeName(type: Int): String? = when (type) {
+        android.telephony.TelephonyManager.NETWORK_TYPE_GPRS,
+        android.telephony.TelephonyManager.NETWORK_TYPE_EDGE,
+        android.telephony.TelephonyManager.NETWORK_TYPE_CDMA,
+        android.telephony.TelephonyManager.NETWORK_TYPE_1xRTT,
+        android.telephony.TelephonyManager.NETWORK_TYPE_IDEN    -> "2G"
+        android.telephony.TelephonyManager.NETWORK_TYPE_UMTS,
+        android.telephony.TelephonyManager.NETWORK_TYPE_HSDPA,
+        android.telephony.TelephonyManager.NETWORK_TYPE_HSUPA,
+        android.telephony.TelephonyManager.NETWORK_TYPE_HSPA,
+        android.telephony.TelephonyManager.NETWORK_TYPE_EVDO_0,
+        android.telephony.TelephonyManager.NETWORK_TYPE_EVDO_A,
+        android.telephony.TelephonyManager.NETWORK_TYPE_EVDO_B,
+        android.telephony.TelephonyManager.NETWORK_TYPE_EHRPD,
+        android.telephony.TelephonyManager.NETWORK_TYPE_HSPAP   -> "3G"
+        android.telephony.TelephonyManager.NETWORK_TYPE_LTE     -> "LTE"
+        android.telephony.TelephonyManager.NETWORK_TYPE_IWLAN   -> "Wi-Fi Call"
+        android.telephony.TelephonyManager.NETWORK_TYPE_NR      -> "5G"
+        else                                                     -> null
+    }
+
     // -- Audio -------------------------------------------------------------------
 
     /** Current ringer mode from [android.media.AudioManager.getRingerMode]. */

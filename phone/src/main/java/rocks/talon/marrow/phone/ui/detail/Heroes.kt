@@ -1463,6 +1463,104 @@ private fun LocationPermissionCard(onGrant: () -> Unit) {
     }
 }
 
+// -- Cellular ----------------------------------------------------------------
+
+/**
+ * Hero for the Cellular section — displays live carrier name, SIM state, network
+ * generation (2G/3G/LTE/5G), signal strength (0–4 bars), and roaming status from
+ * [MarrowViewModel.cellular] ([LiveStats.cellularInfo]).
+ *
+ * All data is polled via the live loop. The [LiveStats.Cellular.networkTypeName] and
+ * [LiveStats.Cellular.signalLevel] fields require the NORMAL permission
+ * [android.Manifest.permission.READ_BASIC_PHONE_STATE] (API 33+, declared in the
+ * manifest — no runtime prompt needed) and are simply absent on API < 33 devices that
+ * lack it. The hero degrades gracefully: it shows whatever fields are available and
+ * hides the rest.
+ *
+ * Phone only. Null on devices without telephony hardware (tablets, emulators, Wear OS).
+ */
+@Composable
+fun CellularHero(vm: MarrowViewModel, section: Section) {
+    val cellular by vm.cellular.collectAsState()
+
+    HeroBox {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconBadge(icon = MarrowIcons.forSection(section.id), size = 44, cornerRadius = 14)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        cellular?.operatorName ?: "Cellular",
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    )
+                    Text(
+                        "Carrier · SIM · network type · signal",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            val cell = cellular
+            if (cell == null) {
+                // First live-loop tick not yet fired
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Waiting for cellular info…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                // SIM state — color-coded: Ready=green, Absent/Restricted/error=red, else amber
+                val simColor = when (cell.simState) {
+                    "Ready"  -> Color(0xFF66BB6A)
+                    "Absent", "I/O Error", "Restricted" -> MaterialTheme.colorScheme.error
+                    else     -> Color(0xFFFFA726)
+                }
+                Spacer(Modifier.height(12.dp))
+                BigStat("SIM", cell.simState, valueColor = simColor)
+
+                val netType = cell.networkTypeName
+                if (netType != null) {
+                    val netColor = when (netType) {
+                        "5G"        -> Color(0xFF66BB6A)
+                        "LTE"       -> MaterialTheme.colorScheme.primary
+                        "3G"        -> Color(0xFFFFA726)
+                        "2G"        -> MaterialTheme.colorScheme.error
+                        "Wi-Fi Call"-> MaterialTheme.colorScheme.tertiary
+                        else        -> MaterialTheme.colorScheme.onSurface
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    BigStat("Network", netType, valueColor = netColor)
+                }
+
+                val sig = cell.signalLevel
+                if (sig != null) {
+                    val sigColor = when {
+                        sig >= 3 -> Color(0xFF66BB6A)
+                        sig == 2 -> Color(0xFFFFA726)
+                        else     -> MaterialTheme.colorScheme.error
+                    }
+                    val bars = "●".repeat(sig) + "○".repeat(4 - sig)
+                    Spacer(Modifier.height(4.dp))
+                    BigStat("Signal", bars, valueColor = sigColor)
+                }
+
+                if (cell.isRoaming) {
+                    Spacer(Modifier.height(4.dp))
+                    BigStat("Roaming", "Yes", valueColor = Color(0xFFFFA726))
+                }
+
+                val simOp = cell.simOperatorName
+                if (simOp != null && simOp != cell.operatorName) {
+                    Spacer(Modifier.height(4.dp))
+                    BigStat("SIM Provider", simOp)
+                }
+            }
+        }
+    }
+}
+
 // -- Cameras -----------------------------------------------------------------
 
 @Composable

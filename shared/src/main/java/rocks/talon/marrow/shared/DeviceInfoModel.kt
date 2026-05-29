@@ -54,6 +54,10 @@ object Sections {
     /** Phone-only location section: GPS/network coordinates, accuracy, speed, bearing.
      *  Requires ACCESS_FINE_LOCATION runtime permission — shows a prompt card when not granted. */
     const val LOCATION = "location"
+    /** Phone-only cellular section: carrier name, SIM state, network type (2G/3G/LTE/5G),
+     *  signal level, and roaming status. Uses READ_BASIC_PHONE_STATE (normal permission, API 33+)
+     *  for network-type and signal data; degrades gracefully on API < 33. */
+    const val CELLULAR = "cellular"
 }
 
 object MarrowPaths {

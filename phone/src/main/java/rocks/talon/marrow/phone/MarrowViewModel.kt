@@ -290,6 +290,22 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _isMusicActive = MutableStateFlow<Boolean?>(null)
     val isMusicActive: StateFlow<Boolean?> = _isMusicActive.asStateFlow()
 
+    // -- Cellular ----------------------------------------------------------------
+
+    /**
+     * Live cellular/telephony snapshot from [LiveStats.cellularInfo].
+     *
+     * Updated each live-loop tick. Null on devices without telephony hardware
+     * (Wi-Fi-only tablets, emulators) or before the first live-loop tick.
+     *
+     * Fields that require [android.Manifest.permission.READ_BASIC_PHONE_STATE]
+     * (API 33+ normal permission) are populated automatically without any runtime prompt.
+     * They fall back to null on API < 33 if [android.Manifest.permission.READ_PHONE_STATE]
+     * is not held.
+     */
+    private val _cellular = MutableStateFlow<LiveStats.Cellular?>(null)
+    val cellular: StateFlow<LiveStats.Cellular?> = _cellular.asStateFlow()
+
     // -- Location ----------------------------------------------------------------
 
     /**
@@ -442,6 +458,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _ringerMode.value = LiveStats.ringerMode(ctx)
                 _mediaVolumePct.value = LiveStats.mediaVolumePct(ctx)
                 _isMusicActive.value = LiveStats.isMusicActive(ctx)
+                // Cellular stats — READ_BASIC_PHONE_STATE (normal, API 33+); null on Wi-Fi-only devices
+                _cellular.value = LiveStats.cellularInfo(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }
