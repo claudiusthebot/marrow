@@ -176,6 +176,18 @@ object WearIcons {
         s("M12 20 L4.5 11.5 A4.5 4.5 0 0 1 12 5 A4.5 4.5 0 0 1 19.5 11.5 Z")
     }
 
+    /**
+     * Cellular: four ascending filled bars — signal strength indicator.
+     * Mirrors the phone MarrowIcons.Cellular glyph adapted for 24×24 Wear viewport.
+     * Bar heights: 3dp, 6dp, 9dp, 12dp — ascending left to right, all bottom-aligned at y=20.
+     */
+    val Cellular = marrow("Cellular") {
+        s("M3 17 H5 V20 H3 Z", fill = true)
+            .s("M7.5 14 H9.5 V20 H7.5 Z", fill = true)
+            .s("M12 11 H14 V20 H12 Z", fill = true)
+            .s("M16.5 8 H18.5 V20 H16.5 Z", fill = true)
+    }
+
     fun forSection(id: String): ImageVector = when (id) {
         Sections.DEVICE -> Device
         Sections.SYSTEM -> System
@@ -191,6 +203,7 @@ object WearIcons {
         Sections.SOFTWARE -> Software
         Sections.GPU -> Gpu
         Sections.ACTIVITY -> Activity
+        Sections.CELLULAR -> Cellular
         else -> Device
     }
 }
