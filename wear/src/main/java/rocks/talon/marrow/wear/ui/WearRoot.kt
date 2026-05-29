@@ -2,6 +2,8 @@ package rocks.talon.marrow.wear.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -69,6 +71,12 @@ import rocks.talon.marrow.wear.ui.theme.MarrowWearTheme
 
 /**
  * Root composable for the watch app.
+ *
+ * v0.46.0 additions over v0.45.0:
+ *   - HeartRatePermissionCard — shown when BODY_SENSORS is not yet granted.
+ *     Tapping launches ActivityResultContracts.RequestPermission. Once granted,
+ *     bodySensorsGranted flips true and HeartRateCard replaces the prompt card.
+ *     Wired via rememberLauncherForActivityResult in SectionListScreen.
  *
  * v0.45.0 additions over v0.15.0:
  *   - HeartRateCard — shows live BPM from TYPE_HEART_RATE on the home list screen,
@@ -139,8 +147,8 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
     val heartRateBpm by vm.heartRateBpm.collectAsState()
 
     // Check BODY_SENSORS permission. If not granted, the HR sensor never fires
-    // and heartRateBpm stays null — HeartRateCard simply won't appear. Re-check
-    // when the composable re-enters composition (e.g. after a settings visit).
+    // and heartRateBpm stays null — HeartRatePermissionCard is shown instead.
+    // Re-check when the composable re-enters composition (e.g. after a settings visit).
     val context = LocalContext.current
     var bodySensorsGranted by remember {
         mutableStateOf(
@@ -148,7 +156,19 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
                 == PackageManager.PERMISSION_GRANTED,
         )
     }
-    // If permission was already granted, ensure the sensor listener is armed.
+
+    // Launcher for the runtime BODY_SENSORS permission dialog.
+    // HeartRatePermissionCard calls onGrant which invokes this launcher.
+    // Once the user grants, bodySensorsGranted flips true and the
+    // LaunchedEffect below arms the sensor listener.
+    val requestPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) bodySensorsGranted = true
+    }
+
+    // If permission was already granted (or just became granted), ensure the
+    // sensor listener is registered.
     LaunchedEffect(bodySensorsGranted) {
         if (bodySensorsGranted) vm.initHeartRateSensor()
     }
@@ -230,10 +250,21 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
                 }
             }
 
-            // Heart rate — visible once BODY_SENSORS is granted and the optical
-            // HR sensor has produced at least one valid reading (BPM > 0).
-            // Stays hidden on devices without a heart-rate sensor.
-            if (!isLoading && bodySensorsGranted && heartRateBpm != null) {
+            // Heart rate — show a permission prompt when BODY_SENSORS is not yet
+            // granted, then the live reading card once granted and the sensor fires.
+            // HeartRatePermissionCard is tappable and launches the system permission
+            // dialog. HeartRateCard only appears after a valid BPM reading arrives.
+            if (!isLoading && !bodySensorsGranted) {
+                item {
+                    HeartRatePermissionCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .transformedHeight(this, transformSpec),
+                        transformation = SurfaceTransformation(transformSpec),
+                        onGrant = { requestPermission.launch(Manifest.permission.BODY_SENSORS) },
+                    )
+                }
+            } else if (!isLoading && heartRateBpm != null) {
                 item {
                     HeartRateCard(
                         bpm = heartRateBpm!!,
@@ -463,6 +494,59 @@ private fun HeartRateCard(
                 )
                 Text(
                     text = "heart rate",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Permission prompt card for BODY_SENSORS — replaces HeartRateCard
+ * when the permission has not yet been granted.
+ *
+ * Tapping calls onGrant, which launches the Android runtime permission
+ * dialog (ActivityResultContracts.RequestPermission). Once the user
+ * grants, bodySensorsGranted flips true via the launcher callback,
+ * LaunchedEffect arms vm.initHeartRateSensor(), and HeartRateCard
+ * replaces this card as soon as the first valid BPM reading arrives.
+ *
+ * No rationale dialog is shown before launching — the card itself
+ * (icon + "Tap to enable") serves as the in-context rationale for a
+ * watch UI where screen real estate is precious.
+ */
+@Composable
+private fun HeartRatePermissionCard(
+    modifier: Modifier,
+    transformation: SurfaceTransformation,
+    onGrant: () -> Unit,
+) {
+    Card(
+        onClick = onGrant,
+        modifier = modifier,
+        transformation = transformation,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = WearIcons.HeartRate,
+                contentDescription = "Heart rate",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Column {
+                Text(
+                    text = "Tap to enable",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = "heart rate sensor",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -767,7 +851,7 @@ private fun BatteryArcCard(
             // Temperature below the gauge when the sensor is readable
             if (battery.temperatureC >= 0f) {
                 Text(
-                    text = "${"%".format(battery.temperatureC)}°C",
+                    text = "${"%.1f".format(battery.temperatureC)}°C",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
