@@ -46,6 +46,7 @@ object DeviceInfoCollector {
             activitySection(context)?.let { add(it) }
             audioSection(context)?.let { add(it) }
             locationSection(context)?.let { add(it) }
+            cellularSection(context)?.let { add(it) }
             cameraSection(context)?.let { add(it) }
             add(buildFlagsSection())
             add(softwareSection(context))
@@ -481,6 +482,85 @@ object DeviceInfoCollector {
             else -> "Location available"
         }
         return Section(Sections.LOCATION, "Location", "location", rows, preview)
+    }
+
+    // -- Cellular ------------------------------------------------------------
+
+    /**
+     * Phone-only section for cellular/telephony data. Surfaces the carrier name, SIM state,
+     * network type, signal level, and roaming status read from [TelephonyManager].
+     *
+     * Network type and signal level require [android.Manifest.permission.READ_BASIC_PHONE_STATE]
+     * (normal permission, API 33+) declared in the manifest; they degrade gracefully to "Unknown"
+     * on API < 33 without [android.Manifest.permission.READ_PHONE_STATE]. All reads are wrapped
+     * in [runCatching] — no crashes on restricted devices or emulators.
+     *
+     * Returns null when the device has no telephony hardware so no empty card appears on
+     * Wi-Fi-only tablets or Wear OS watches.
+     */
+    internal fun cellularSection(context: Context): Section? {
+        val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager ?: return null
+        if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)) return null
+
+        val rows = mutableListOf<Row>()
+
+        // Zero-permission carrier fields
+        val opName = tm.networkOperatorName.takeIf { it.isNotBlank() }
+        if (opName != null) rows += Row("Carrier", opName)
+        val simOpName = tm.simOperatorName.takeIf { it.isNotBlank() }
+        if (simOpName != null && simOpName != opName) rows += Row("SIM operator", simOpName)
+
+        val simState = when (tm.simState) {
+            TelephonyManager.SIM_STATE_READY           -> "Ready"
+            TelephonyManager.SIM_STATE_ABSENT          -> "Absent"
+            TelephonyManager.SIM_STATE_LOCKED          -> "Locked"
+            TelephonyManager.SIM_STATE_PIN_REQUIRED    -> "PIN Required"
+            TelephonyManager.SIM_STATE_PUK_REQUIRED    -> "PUK Required"
+            TelephonyManager.SIM_STATE_NETWORK_LOCKED  -> "Network Locked"
+            TelephonyManager.SIM_STATE_CARD_IO_ERROR   -> "I/O Error"
+            TelephonyManager.SIM_STATE_CARD_RESTRICTED -> "Restricted"
+            else                                       -> "Unknown"
+        }
+        rows += Row("SIM state", simState)
+
+        val countryIso = tm.networkCountryIso?.uppercase(Locale.US)
+        if (!countryIso.isNullOrBlank()) rows += Row("Country", countryIso)
+        if (tm.isNetworkRoaming) rows += Row("Roaming", "Yes")
+
+        // READ_BASIC_PHONE_STATE (normal permission, API 33+) — network type
+        val netType = runCatching {
+            val t = tm.dataNetworkType
+            when (t) {
+                TelephonyManager.NETWORK_TYPE_GPRS,
+                TelephonyManager.NETWORK_TYPE_EDGE,
+                TelephonyManager.NETWORK_TYPE_CDMA,
+                TelephonyManager.NETWORK_TYPE_1xRTT,
+                TelephonyManager.NETWORK_TYPE_IDEN    -> "2G"
+                TelephonyManager.NETWORK_TYPE_UMTS,
+                TelephonyManager.NETWORK_TYPE_HSDPA,
+                TelephonyManager.NETWORK_TYPE_HSUPA,
+                TelephonyManager.NETWORK_TYPE_HSPA,
+                TelephonyManager.NETWORK_TYPE_EVDO_0,
+                TelephonyManager.NETWORK_TYPE_EVDO_A,
+                TelephonyManager.NETWORK_TYPE_EVDO_B,
+                TelephonyManager.NETWORK_TYPE_EHRPD,
+                TelephonyManager.NETWORK_TYPE_HSPAP   -> "3G"
+                TelephonyManager.NETWORK_TYPE_LTE     -> "LTE"
+                TelephonyManager.NETWORK_TYPE_IWLAN   -> "Wi-Fi Call"
+                TelephonyManager.NETWORK_TYPE_NR      -> "5G"
+                else                                  -> null
+            }
+        }.getOrNull()
+        if (netType != null) rows += Row("Network type", netType)
+
+        // Signal level (0–4 bars)
+        val signalLevel = runCatching { tm.signalStrength?.level?.takeIf { it in 0..4 } }.getOrNull()
+        if (signalLevel != null) rows += Row("Signal", "$signalLevel / 4 bars")
+
+        rows += Row("Note", "Network type + signal require READ_BASIC_PHONE_STATE (API 33+)")
+
+        val preview = listOfNotNull(opName, netType).joinToString(" · ").ifBlank { "Cellular" }
+        return Section(Sections.CELLULAR, "Cellular", "cellular", rows, preview)
     }
 
     // -- Cameras -------------------------------------------------------------
