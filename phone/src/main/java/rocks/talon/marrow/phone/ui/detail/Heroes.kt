@@ -1,5 +1,7 @@
 package rocks.talon.marrow.phone.ui.detail
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -22,15 +24,13 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1420,7 +1421,7 @@ fun LocationHero(vm: MarrowViewModel, section: Section) {
                     val providerLabel = when (loc.provider) {
                         android.location.LocationManager.GPS_PROVIDER -> "GPS"
                         android.location.LocationManager.NETWORK_PROVIDER -> "Network"
-                        android.location.LocationManager.FUSED_PROVIDER -> "Fused"
+                        "fused" -> "Fused"  // LocationManager.FUSED_PROVIDER (API 31) — use string literal for minSdk 30 compat
                         else -> loc.provider?.replaceFirstChar { it.uppercase() } ?: "Unknown"
                     }
                     Spacer(Modifier.height(4.dp))
