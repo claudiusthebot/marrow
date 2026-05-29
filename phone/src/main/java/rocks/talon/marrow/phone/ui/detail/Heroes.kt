@@ -1,5 +1,7 @@
 package rocks.talon.marrow.phone.ui.detail
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -23,8 +25,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,6 +40,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1305,6 +1312,152 @@ fun AudioHero(vm: MarrowViewModel, section: Section) {
                                  else MaterialTheme.colorScheme.onSurfaceVariant
                 Spacer(Modifier.height(8.dp))
                 BigStat("Music", if (music) "Playing" else "Idle", valueColor = musicColor)
+            }
+        }
+    }
+}
+
+// -- Location ----------------------------------------------------------------
+
+/**
+ * Hero for the Location section — shows live GPS/network coordinates, accuracy,
+ * altitude, speed, and bearing from [MarrowViewModel.lastLocation].
+ *
+ * ACCESS_FINE_LOCATION is a runtime permission. When not yet granted:
+ *   - A tappable [LocationPermissionCard] is shown.
+ *   - Tapping launches the system permission dialog.
+ *   - On grant: [MarrowViewModel.initLocationUpdates] is called via [LaunchedEffect].
+ *   - Once a fix arrives, [lastLocation] becomes non-null and the stats grid appears.
+ *
+ * When granted and a fix is available:
+ *   - Latitude (°N/S) and longitude (°E/W) with 6 decimal places
+ *   - Accuracy radius in metres
+ *   - Altitude in metres (when [android.location.Location.hasAltitude] is true)
+ *   - Speed in km/h (when [android.location.Location.hasSpeed] is true)
+ *   - Bearing compass point + degrees (when [android.location.Location.hasBearing] is true)
+ *   - Provider name (GPS / network / fused)
+ *   - Fix age in seconds
+ *
+ * Phone only — Wear has dedicated [Sensor.TYPE_ACCELEROMETER] + GPS via Health Services.
+ */
+@Composable
+fun LocationHero(vm: MarrowViewModel, section: Section) {
+    val lastLocation by vm.lastLocation.collectAsState()
+    val context = LocalContext.current
+
+    var locationGranted by remember {
+        mutableStateOf(
+            context.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED,
+        )
+    }
+
+    val requestPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) locationGranted = true
+    }
+
+    // Arm the location listener as soon as permission is (or becomes) granted.
+    LaunchedEffect(locationGranted) {
+        if (locationGranted) vm.initLocationUpdates()
+    }
+
+    HeroBox {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconBadge(icon = MarrowIcons.forSection(section.id), size = 44, cornerRadius = 14)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        "Location",
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    )
+                    Text(
+                        "GPS · network · accuracy · speed · bearing",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (!locationGranted) {
+                Spacer(Modifier.height(16.dp))
+                LocationPermissionCard(
+                    onGrant = { requestPermission.launch(android.Manifest.permission.ACCESS_FINE_LOCATION) },
+                )
+            } else {
+                val loc = lastLocation
+                if (loc == null) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Waiting for location fix…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    val latDir = if (loc.latitude >= 0) "N" else "S"
+                    val lonDir = if (loc.longitude >= 0) "E" else "W"
+                    val latStr = "%.6f° %s".format(Math.abs(loc.latitude), latDir)
+                    val lonStr = "%.6f° %s".format(Math.abs(loc.longitude), lonDir)
+                    Spacer(Modifier.height(12.dp))
+                    BigStat("Latitude", latStr)
+                    Spacer(Modifier.height(4.dp))
+                    BigStat("Longitude", lonStr)
+                    Spacer(Modifier.height(4.dp))
+                    BigStat("Accuracy", "±%.0f m".format(loc.accuracy))
+                    if (loc.hasAltitude()) {
+                        Spacer(Modifier.height(4.dp))
+                        BigStat("Altitude", "%.0f m".format(loc.altitude))
+                    }
+                    if (loc.hasSpeed()) {
+                        Spacer(Modifier.height(4.dp))
+                        BigStat("Speed", "%.1f km/h".format(loc.speed * 3.6f))
+                    }
+                    if (loc.hasBearing()) {
+                        Spacer(Modifier.height(4.dp))
+                        BigStat("Bearing", "${degreesToCompassPoint(loc.bearing)} ${loc.bearing.roundToInt()}°")
+                    }
+                    val providerLabel = when (loc.provider) {
+                        android.location.LocationManager.GPS_PROVIDER -> "GPS"
+                        android.location.LocationManager.NETWORK_PROVIDER -> "Network"
+                        "fused" -> "Fused"  // LocationManager.FUSED_PROVIDER (API 31) — use string literal for minSdk 30 compat
+                        else -> loc.provider?.replaceFirstChar { it.uppercase() } ?: "Unknown"
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    BigStat("Provider", providerLabel)
+                    val ageSec = (System.currentTimeMillis() - loc.time) / 1000L
+                    Spacer(Modifier.height(4.dp))
+                    BigStat("Fix age", if (ageSec < 60) "${ageSec}s" else "${ageSec / 60}m ${ageSec % 60}s")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocationPermissionCard(onGrant: () -> Unit) {
+    MarrowCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onGrant,
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconBadge(icon = MarrowIcons.Location, size = 40, cornerRadius = 12)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    "Tap to enable location",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    "Requires ACCESS_FINE_LOCATION permission",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

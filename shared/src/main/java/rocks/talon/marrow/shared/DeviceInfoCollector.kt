@@ -45,6 +45,7 @@ object DeviceInfoCollector {
             add(sensorsSection(context))
             activitySection(context)?.let { add(it) }
             audioSection(context)?.let { add(it) }
+            locationSection(context)?.let { add(it) }
             cameraSection(context)?.let { add(it) }
             add(buildFlagsSection())
             add(softwareSection(context))
@@ -444,6 +445,42 @@ object DeviceInfoCollector {
             add(Row("Note", "Live stats via AudioManager · zero permissions"))
         }
         return Section(Sections.AUDIO, "Audio", "audio", rows, "Ringer · volume · music")
+    }
+
+    // -- Location ------------------------------------------------------------
+
+    /**
+     * Phone-only section for location providers. Lists available GPS/network/passive
+     * providers and their capabilities. Actual live coordinates are streamed via
+     * [MarrowViewModel.initLocationUpdates] after ACCESS_FINE_LOCATION is granted
+     * and displayed in LocationHero — they cannot be read synchronously here.
+     *
+     * Returns null when the device has no LocationManager (extremely rare),
+     * so no empty card appears on unusual form factors.
+     */
+    private fun locationSection(context: Context): Section? {
+        val lm = context.getSystemService(Context.LOCATION_SERVICE)
+            as? android.location.LocationManager ?: return null
+        val rows = buildList {
+            val providers = lm.allProviders
+            if (providers.isNotEmpty()) {
+                add(Row("Providers", providers.joinToString(" · ")))
+            }
+            val gpsEnabled = runCatching {
+                lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)
+            }.getOrDefault(false)
+            val networkEnabled = runCatching {
+                lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+            }.getOrDefault(false)
+            add(Row("GPS enabled", if (gpsEnabled) "Yes" else "No"))
+            add(Row("Network location", if (networkEnabled) "Yes" else "No"))
+            add(Row("Note", "Live coordinates require ACCESS_FINE_LOCATION · tap to grant"))
+        }
+        val preview = when {
+            lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) -> "GPS available"
+            else -> "Location available"
+        }
+        return Section(Sections.LOCATION, "Location", "location", rows, preview)
     }
 
     // -- Cameras -------------------------------------------------------------
