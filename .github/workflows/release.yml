@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   release:
-    name: Build signed release APKs
+    name: Build signed release APKs + AAB
     runs-on: ubuntu-latest
     timeout-minutes: 40
 
@@ -55,47 +55,59 @@ jobs:
           echo "${{ secrets.MARROW_KEYSTORE_B64 }}" | base64 -d > marrow-release.jks
           ls -la marrow-release.jks
 
-      - name: Build signed release APKs
+      - name: Build signed release APKs and AAB
         run: |
-          ./gradlew :phone:assembleRelease :wear:assembleRelease --no-daemon \
+          ./gradlew :phone:assembleRelease :phone:bundleRelease :wear:assembleRelease --no-daemon \
             -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/marrow-release.jks" \
             -Pandroid.injected.signing.store.password="${{ secrets.MARROW_KEYSTORE_PASSWORD }}" \
             -Pandroid.injected.signing.key.alias="${{ secrets.MARROW_KEY_ALIAS }}" \
             -Pandroid.injected.signing.key.password="${{ secrets.MARROW_KEY_PASSWORD }}"
 
-      - name: Rename APKs to include version
+      - name: Collect release artifacts
         run: |
           TAG="${{ steps.tag.outputs.name }}"
           mkdir -p release-apks
+          # Phone APK (for sideloading)
           cp phone/build/outputs/apk/release/phone-release.apk \
              "release-apks/marrow-phone-${TAG}.apk" 2>/dev/null || true
-          cp wear/build/outputs/apk/release/wear-release.apk \
-             "release-apks/marrow-wear-${TAG}.apk" 2>/dev/null || true
-          # also accept -unsigned suffix if signing wasn't applied
           cp phone/build/outputs/apk/release/phone-release-unsigned.apk \
              "release-apks/marrow-phone-${TAG}.apk" 2>/dev/null || true
+          # Wear APK
+          cp wear/build/outputs/apk/release/wear-release.apk \
+             "release-apks/marrow-wear-${TAG}.apk" 2>/dev/null || true
           cp wear/build/outputs/apk/release/wear-release-unsigned.apk \
              "release-apks/marrow-wear-${TAG}.apk" 2>/dev/null || true
+          # Phone AAB (App Bundle — required for Play Store submission)
+          cp phone/build/outputs/bundle/release/phone-release.aab \
+             "release-apks/marrow-phone-${TAG}.aab" 2>/dev/null || true
           ls -lh release-apks/
 
-      - name: Publish release and upload APKs
+      - name: Publish release and upload artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.tag.outputs.name }}"
-          # If a release was created manually before the tag push (common in heartbeat flows),
-          # upload APKs to the existing release rather than failing to create a duplicate.
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            echo "Release $TAG already exists — uploading signed APKs to existing release"
-            gh release upload "$TAG" \
+          upload_to_release() {
+            local tag="$1"
+            # APKs are always present
+            gh release upload "$tag" \
               release-apks/marrow-phone-*.apk \
               release-apks/marrow-wear-*.apk \
               --clobber
+            # AAB is present when bundleRelease succeeded (Play Store upload)
+            if compgen -G "release-apks/marrow-phone-*.aab" > /dev/null; then
+              gh release upload "$tag" release-apks/marrow-phone-*.aab --clobber
+            fi
+          }
+          # If a release was created manually before the tag push (common in heartbeat flows),
+          # upload artifacts to the existing release rather than failing to create a duplicate.
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG already exists — uploading signed artifacts to existing release"
+            upload_to_release "$TAG"
           else
-            echo "Creating new release $TAG with signed APKs"
+            echo "Creating new release $TAG with signed artifacts"
             gh release create "$TAG" \
               --title "Marrow $TAG" \
-              --generate-notes \
-              release-apks/marrow-phone-*.apk \
-              release-apks/marrow-wear-*.apk
+              --generate-notes
+            upload_to_release "$TAG"
           fi
