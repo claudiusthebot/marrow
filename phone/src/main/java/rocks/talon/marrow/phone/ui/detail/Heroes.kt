@@ -145,7 +145,13 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
             Column {
                 BigStat("Voltage", if (voltageV >= 0) "%.2f V".format(voltageV) else "—")
                 Spacer(Modifier.height(8.dp))
-                BigStat("Temp", if (tempC >= 0) "%.1f °C".format(tempC) else "—")
+                val tempColor = when {
+                    tempC >= 45f -> Color(0xFFE53935) // hot (red)
+                    tempC >= 35f -> Color(0xFFFFA726) // warm (amber)
+                    tempC >= 0f  -> Color(0xFF66BB6A) // normal (green)
+                    else         -> MaterialTheme.colorScheme.onSurface
+                }
+                BigStat("Temp", if (tempC >= 0) "%.1f °C".format(tempC) else "—", valueColor = tempColor)
                 Spacer(Modifier.height(8.dp))
                 if (!isWatch && battery != null) {
                     BigStat(
