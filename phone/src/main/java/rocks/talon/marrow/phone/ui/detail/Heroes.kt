@@ -987,6 +987,7 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
     val wifiLinkSpeedMbps by vm.wifiLinkSpeedMbps.collectAsState()
     val isAirplaneModeOn by vm.isAirplaneModeOn.collectAsState()
     val isNfcEnabled by vm.isNfcEnabled.collectAsState()
+    val isBluetoothEnabled by vm.isBluetoothEnabled.collectAsState()
     val totalRxBytes by vm.totalRxBytes.collectAsState()
     val totalTxBytes by vm.totalTxBytes.collectAsState()
     HeroBox {
@@ -1041,6 +1042,14 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
             if (nfcOn != null) {
                 Spacer(Modifier.height(8.dp))
                 BigStat("NFC", if (nfcOn) "On" else "Off")
+            }
+            // Bluetooth state — Settings.Global "bluetooth_on", zero permissions
+            val btOn = isBluetoothEnabled
+            if (btOn != null) {
+                Spacer(Modifier.height(8.dp))
+                val btColor = if (btOn) MaterialTheme.colorScheme.primary
+                              else MaterialTheme.colorScheme.onSurface
+                BigStat("Bluetooth", if (btOn) "On" else "Off", valueColor = btColor)
             }
             // Network traffic totals since boot — shown when TrafficStats is available
             val rxBytes = totalRxBytes
