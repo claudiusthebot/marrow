@@ -991,6 +991,7 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
     val (rxBps, txBps) = networkRatePair
     val wifiRssiDbm by vm.wifiRssiDbm.collectAsState()
     val wifiLinkSpeedMbps by vm.wifiLinkSpeedMbps.collectAsState()
+    val wifiFrequencyMhz by vm.wifiFrequencyMhz.collectAsState()
     val isAirplaneModeOn by vm.isAirplaneModeOn.collectAsState()
     val isNfcEnabled by vm.isNfcEnabled.collectAsState()
     val isBluetoothEnabled by vm.isBluetoothEnabled.collectAsState()
@@ -1026,6 +1027,16 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
             if (liveSpeed != null) {
                 Spacer(Modifier.height(8.dp))
                 BigStat("Link Speed", "$liveSpeed Mbps")
+            }
+            val liveFreqMhz = wifiFrequencyMhz
+            if (liveFreqMhz != null) {
+                Spacer(Modifier.height(8.dp))
+                val bandLabel = when {
+                    liveFreqMhz < 3000 -> "2.4 GHz"
+                    liveFreqMhz < 5945 -> "5 GHz"
+                    else               -> "6 GHz"
+                }
+                BigStat("Wi-Fi Band", bandLabel)
             }
             // Live throughput — shown after the first two polling ticks provide a rate
             if (rxBps > 0L || txBps > 0L) {

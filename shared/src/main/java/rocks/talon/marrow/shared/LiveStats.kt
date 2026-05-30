@@ -637,6 +637,26 @@ object LiveStats {
         return if (speed > 0) speed else null
     }
 
+
+    /**
+     * Live Wi-Fi frequency in MHz from [android.net.wifi.WifiInfo.getFrequency].
+     * Returns null when not connected to a Wi-Fi network or frequency is unavailable.
+     *
+     * Typical values:
+     * - 2.4 GHz band: 2412–2484 MHz
+     * - 5 GHz band:   5180–5825 MHz
+     * - 6 GHz band:   5945–7125 MHz (Wi-Fi 6E / 7)
+     *
+     * No permissions required (uses same deprecated [WifiInfo] as [wifiRssi]).
+     */
+    @Suppress("DEPRECATION")
+    fun wifiFrequencyMhz(context: Context): Int? {
+        val wm = context.applicationContext
+            .getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return null
+        val freq = wm.connectionInfo?.frequency ?: return null
+        return if (freq > 0) freq else null
+    }
+
     // -- Charge time remaining --------------------------------------------------
 
     /**
