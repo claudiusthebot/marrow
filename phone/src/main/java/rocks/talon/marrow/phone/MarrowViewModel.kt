@@ -118,6 +118,10 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     /** Live Wi-Fi link speed in Mbps. null when not connected to Wi-Fi or unavailable. */
     private val _wifiLinkSpeedMbps = MutableStateFlow<Int?>(null)
     val wifiLinkSpeedMbps: StateFlow<Int?> = _wifiLinkSpeedMbps.asStateFlow()
+    /** Live Wi-Fi frequency in MHz. null when not connected to Wi-Fi or unavailable.
+     *  2.4 GHz band ≈ 2412–2484 MHz; 5 GHz band ≈ 5180–5825 MHz; 6 GHz (Wi-Fi 6E/7) ≈ 5945–7125 MHz. */
+    private val _wifiFrequencyMhz = MutableStateFlow<Int?>(null)
+    val wifiFrequencyMhz: StateFlow<Int?> = _wifiFrequencyMhz.asStateFlow()
     /** Estimated time to full charge in milliseconds. -1L when discharging or unavailable. */
     private val _chargeTimeRemainingMs = MutableStateFlow(-1L)
     val chargeTimeRemainingMs: StateFlow<Long> = _chargeTimeRemainingMs.asStateFlow()
@@ -441,6 +445,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _wifiRssiDbm.value = LiveStats.wifiRssi(ctx)
                 // Wi-Fi link speed — negotiated data rate in Mbps (null when not on Wi-Fi)
                 _wifiLinkSpeedMbps.value = LiveStats.wifiLinkSpeedMbps(ctx)
+                // Wi-Fi frequency band — MHz for 2.4/5/6 GHz band detection (null when not on Wi-Fi)
+                _wifiFrequencyMhz.value = LiveStats.wifiFrequencyMhz(ctx)
                 // Charge time remaining — BatteryManager estimate, -1L when discharging or unavailable
                 _chargeTimeRemainingMs.value = LiveStats.chargeTimeRemainingMs(ctx)
                 // Screen brightness — Settings.System.SCREEN_BRIGHTNESS, no permissions needed
