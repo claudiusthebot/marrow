@@ -756,6 +756,21 @@ object LiveStats {
             android.nfc.NfcAdapter.getDefaultAdapter(context)?.isEnabled
         }.getOrNull()
 
+    /**
+     * Whether Bluetooth is currently enabled on this device.
+     *
+     * Reads Settings.Global key "bluetooth_on" which is world-readable —
+     * zero additional permissions required on all API levels (including API 31+
+     * where BLUETOOTH_CONNECT would otherwise be needed for BluetoothAdapter).
+     *
+     * Returns null only on unexpected exceptions (should never happen in practice).
+     */
+    fun isBluetoothEnabled(context: Context): Boolean? = runCatching {
+        Settings.Global.getInt(context.contentResolver, "bluetooth_on", -1)
+            .takeIf { it >= 0 }
+            ?.let { it != 0 }
+    }.getOrNull()
+
     // -- Network traffic totals -------------------------------------------------
 
     /**

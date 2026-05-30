@@ -139,6 +139,10 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _isNfcEnabled = MutableStateFlow<Boolean?>(null)
     val isNfcEnabled: StateFlow<Boolean?> = _isNfcEnabled.asStateFlow()
 
+    /** Whether Bluetooth is enabled. Reads Settings.Global "bluetooth_on" — zero permissions. */
+    private val _isBluetoothEnabled = MutableStateFlow<Boolean?>(null)
+    val isBluetoothEnabled: StateFlow<Boolean?> = _isBluetoothEnabled.asStateFlow()
+
     /** Cumulative bytes received across all interfaces since the last device reboot.
      *  Polled each live-loop tick from [LiveStats.totalRxBytes].
      *  null when [android.net.TrafficStats.UNSUPPORTED] is returned by the system. */
@@ -449,6 +453,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _isAirplaneModeOn.value = LiveStats.isAirplaneModeOn(ctx)
                 // NFC state — NfcAdapter.getDefaultAdapter, null when no NFC hardware
                 _isNfcEnabled.value = LiveStats.isNfcEnabled(ctx)
+                // Bluetooth state — Settings.Global "bluetooth_on", zero permissions
+                _isBluetoothEnabled.value = LiveStats.isBluetoothEnabled(ctx)
                 // Network traffic totals since boot — TrafficStats, polled, no permissions needed
                 _totalRxBytes.value = LiveStats.totalRxBytes()
                 _totalTxBytes.value = LiveStats.totalTxBytes()
