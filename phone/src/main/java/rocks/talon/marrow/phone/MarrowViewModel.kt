@@ -122,6 +122,11 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
      *  2.4 GHz band ≈ 2412–2484 MHz; 5 GHz band ≈ 5180–5825 MHz; 6 GHz (Wi-Fi 6E/7) ≈ 5945–7125 MHz. */
     private val _wifiFrequencyMhz = MutableStateFlow<Int?>(null)
     val wifiFrequencyMhz: StateFlow<Int?> = _wifiFrequencyMhz.asStateFlow()
+    /** 802.11 Wi-Fi standard label for the current connection.
+     *  "Wi-Fi 4" (802.11n) / "Wi-Fi 5" (802.11ac) / "Wi-Fi 6" (802.11ax) / "Wi-Fi 7" (802.11be).
+     *  null when not on Wi-Fi, standard is legacy/unknown, or before first live-loop tick. */
+    private val _wifiStandard = MutableStateFlow<String?>(null)
+    val wifiStandard: StateFlow<String?> = _wifiStandard.asStateFlow()
     /** Device's primary IPv4 address (e.g. "192.168.1.42"). null when no active IPv4 interface. */
     private val _localIpV4 = MutableStateFlow<String?>(null)
     val localIpV4: StateFlow<String?> = _localIpV4.asStateFlow()
@@ -149,6 +154,11 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     /** Whether Bluetooth is enabled. Reads Settings.Global "bluetooth_on" — zero permissions. */
     private val _isBluetoothEnabled = MutableStateFlow<Boolean?>(null)
     val isBluetoothEnabled: StateFlow<Boolean?> = _isBluetoothEnabled.asStateFlow()
+
+    /** Whether a VPN tunnel is currently active. Checked via NetworkCapabilities.TRANSPORT_VPN.
+     *  null when ConnectivityManager is unavailable; false when no active network. */
+    private val _isVpnActive = MutableStateFlow<Boolean?>(null)
+    val isVpnActive: StateFlow<Boolean?> = _isVpnActive.asStateFlow()
 
     /** Cumulative bytes received across all interfaces since the last device reboot.
      *  Polled each live-loop tick from [LiveStats.totalRxBytes].
@@ -450,6 +460,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _wifiLinkSpeedMbps.value = LiveStats.wifiLinkSpeedMbps(ctx)
                 // Wi-Fi frequency band — MHz for 2.4/5/6 GHz band detection (null when not on Wi-Fi)
                 _wifiFrequencyMhz.value = LiveStats.wifiFrequencyMhz(ctx)
+                // Wi-Fi standard — 802.11n/ac/ax/be label (null when not on Wi-Fi or legacy)
+                _wifiStandard.value = LiveStats.wifiStandard(ctx)
                 // Local IPv4 address — NetworkInterface, no permissions needed
                 _localIpV4.value = LiveStats.localIpV4()
                 // Charge time remaining — BatteryManager estimate, -1L when discharging or unavailable
@@ -466,6 +478,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _isNfcEnabled.value = LiveStats.isNfcEnabled(ctx)
                 // Bluetooth state — Settings.Global "bluetooth_on", zero permissions
                 _isBluetoothEnabled.value = LiveStats.isBluetoothEnabled(ctx)
+                // VPN state — NetworkCapabilities.TRANSPORT_VPN, no extra permissions
+                _isVpnActive.value = LiveStats.isVpnActive(ctx)
                 // Network traffic totals since boot — TrafficStats, polled, no permissions needed
                 _totalRxBytes.value = LiveStats.totalRxBytes()
                 _totalTxBytes.value = LiveStats.totalTxBytes()
