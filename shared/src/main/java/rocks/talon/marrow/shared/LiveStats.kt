@@ -718,6 +718,30 @@ object LiveStats {
     }
 
     /**
+     * The SSID (network name) of the currently connected Wi-Fi network, or null
+     * when not connected, the SSID is unknown, or the SSID is unavailable because
+     * [android.Manifest.permission.ACCESS_FINE_LOCATION] has not been granted.
+     *
+     * Android wraps SSIDs in double-quote characters (`"example"`); this function
+     * strips them so the value is ready to display as-is. Returns null rather than
+     * `<unknown ssid>` or an empty string.
+     *
+     * Uses the deprecated [WifiInfo] API (same path as [wifiRssi]), which is the
+     * only approach that works reliably without requiring a [android.net.NetworkCallback].
+     * ACCESS_FINE_LOCATION must be granted at runtime on API 29+ for this to return
+     * anything other than null/unknown; the permission is already in the manifest and
+     * prompted via [LocationHero].
+     */
+    @Suppress("DEPRECATION")
+    fun wifiSsid(context: Context): String? = runCatching {
+        val wm = context.applicationContext
+            .getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return@runCatching null
+        val raw = wm.connectionInfo?.ssid ?: return@runCatching null
+        if (raw.isBlank() || raw == WifiManager.UNKNOWN_SSID) return@runCatching null
+        raw.trim('"').takeIf { it.isNotBlank() }
+    }.getOrNull()
+
+    /**
      * Returns the device's primary IPv4 address (e.g. "192.168.1.42"), or null if the
      * device has no active non-loopback IPv4 interface.
      *
