@@ -992,10 +992,12 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
     val wifiRssiDbm by vm.wifiRssiDbm.collectAsState()
     val wifiLinkSpeedMbps by vm.wifiLinkSpeedMbps.collectAsState()
     val wifiFrequencyMhz by vm.wifiFrequencyMhz.collectAsState()
+    val wifiStandard by vm.wifiStandard.collectAsState()
     val localIpV4 by vm.localIpV4.collectAsState()
     val isAirplaneModeOn by vm.isAirplaneModeOn.collectAsState()
     val isNfcEnabled by vm.isNfcEnabled.collectAsState()
     val isBluetoothEnabled by vm.isBluetoothEnabled.collectAsState()
+    val isVpnActive by vm.isVpnActive.collectAsState()
     val totalRxBytes by vm.totalRxBytes.collectAsState()
     val totalTxBytes by vm.totalTxBytes.collectAsState()
     HeroBox {
@@ -1039,6 +1041,11 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
                 }
                 BigStat("Wi-Fi Band", bandLabel)
             }
+            val wifiStd = wifiStandard
+            if (wifiStd != null) {
+                Spacer(Modifier.height(8.dp))
+                BigStat("Wi-Fi Std", wifiStd)
+            }
             val ip = localIpV4
             if (ip != null) {
                 Spacer(Modifier.height(8.dp))
@@ -1073,6 +1080,14 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
                 val btColor = if (btOn) MaterialTheme.colorScheme.primary
                               else MaterialTheme.colorScheme.onSurface
                 BigStat("Bluetooth", if (btOn) "On" else "Off", valueColor = btColor)
+            }
+            // VPN state — NetworkCapabilities.TRANSPORT_VPN, zero extra permissions
+            val vpnOn = isVpnActive
+            if (vpnOn != null) {
+                Spacer(Modifier.height(8.dp))
+                val vpnColor = if (vpnOn) MaterialTheme.colorScheme.primary
+                               else MaterialTheme.colorScheme.onSurface
+                BigStat("VPN", if (vpnOn) "Active" else "Off", valueColor = vpnColor)
             }
             // Network traffic totals since boot — shown when TrafficStats is available
             val rxBytes = totalRxBytes

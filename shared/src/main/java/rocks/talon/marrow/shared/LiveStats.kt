@@ -660,6 +660,33 @@ object LiveStats {
     }
 
     /**
+     * The 802.11 Wi-Fi standard of the current connection as a user-facing label,
+     * or null when not connected to Wi-Fi, the standard is unknown/legacy, or the
+     * device reports [android.net.wifi.ScanResult.WIFI_STANDARD_UNKNOWN].
+     *
+     * Uses [android.net.wifi.WifiInfo.getWifiStandard] (API 30+, matching minSdk).
+     * Returns one of: "Wi-Fi 4" (802.11n), "Wi-Fi 5" (802.11ac), "Wi-Fi 6" (802.11ax /
+     * Wi-Fi 6E), "Wi-Fi 7" (802.11be). Legacy 802.11a/b/g returns null — too old to be
+     * worth displaying on a modern device. Uses same deprecated [WifiInfo] as [wifiRssi].
+     *
+     * Note: the WIFI_STANDARD_* constants are defined in [android.net.wifi.ScanResult],
+     * not [android.net.wifi.WifiInfo], despite being returned by [WifiInfo.getWifiStandard].
+     */
+    @Suppress("DEPRECATION")
+    fun wifiStandard(context: Context): String? {
+        val wm = context.applicationContext
+            .getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return null
+        val info = wm.connectionInfo ?: return null
+        return when (info.wifiStandard) {
+            android.net.wifi.ScanResult.WIFI_STANDARD_11N  -> "Wi-Fi 4"  // 802.11n
+            android.net.wifi.ScanResult.WIFI_STANDARD_11AC -> "Wi-Fi 5"  // 802.11ac
+            android.net.wifi.ScanResult.WIFI_STANDARD_11AX -> "Wi-Fi 6"  // 802.11ax / Wi-Fi 6E
+            android.net.wifi.ScanResult.WIFI_STANDARD_11BE -> "Wi-Fi 7"  // 802.11be
+            else -> null  // UNKNOWN(0), LEGACY(1), or future undeclared standards
+        }
+    }
+
+    /**
      * Returns the device's primary IPv4 address (e.g. "192.168.1.42"), or null if the
      * device has no active non-loopback IPv4 interface.
      *
@@ -806,6 +833,23 @@ object LiveStats {
         Settings.Global.getInt(context.contentResolver, "bluetooth_on", -1)
             .takeIf { it >= 0 }
             ?.let { it != 0 }
+    }.getOrNull()
+
+    /**
+     * Whether a VPN tunnel is currently active on this device.
+     *
+     * Checks [android.net.NetworkCapabilities.TRANSPORT_VPN] on the active network
+     * via [android.net.ConnectivityManager]. ACCESS_NETWORK_STATE is already declared
+     * in the manifest — no additional permissions required.
+     *
+     * Returns false when there is no active network (airplane mode, etc.);
+     * null when ConnectivityManager is unavailable (should not occur in practice).
+     */
+    fun isVpnActive(context: Context): Boolean? = runCatching {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE)
+            as? android.net.ConnectivityManager ?: return@runCatching null
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return@runCatching false
+        caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)
     }.getOrNull()
 
     // -- Network traffic totals -------------------------------------------------
