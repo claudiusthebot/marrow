@@ -914,6 +914,12 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
     val isDarkMode by vm.isDarkMode.collectAsState()
     val isAutoRotateEnabled by vm.isAutoRotateEnabled.collectAsState()
     val screenTimeoutMs by vm.screenTimeoutMs.collectAsState()
+    val ctx = LocalContext.current
+    val resolutionStr = remember {
+        val dm = ctx.resources.displayMetrics
+        "${dm.widthPixels}×${dm.heightPixels}"
+    }
+    val densityDpiVal = remember { ctx.resources.displayMetrics.densityDpi }
     val res = section.rows.firstOrNull { it.label == "Resolution" }?.value ?: "—"
     val dpi = section.rows.firstOrNull { it.label == "Density" }?.value ?: "—"
     val refresh = section.rows.firstOrNull { it.label == "Refresh rate" }?.value ?: "—"
@@ -997,6 +1003,10 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
                 Spacer(Modifier.height(4.dp))
                 BigStat("Timeout", LiveStats.formatScreenTimeout(timeoutMs))
             }
+            Spacer(Modifier.height(4.dp))
+            BigStat("Resolution", resolutionStr)
+            Spacer(Modifier.height(4.dp))
+            BigStat("PPI", "$densityDpiVal dpi")
         }
     }
 }
