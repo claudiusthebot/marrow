@@ -500,4 +500,39 @@ class LiveStatsTest {
         // Guard against division by zero / uninitialized clocks
         assertEquals(-1, LiveStats.deepSleepFractionPct(0L, 0L))
     }
+
+    // ── thermalStatusLabel ────────────────────────────────────────────────────
+
+    @Test fun thermalStatusLabel_none() {
+        assertEquals("None", LiveStats.thermalStatusLabel(0))
+    }
+
+    @Test fun thermalStatusLabel_light() {
+        assertEquals("Light", LiveStats.thermalStatusLabel(1))
+    }
+
+    @Test fun thermalStatusLabel_moderate() {
+        assertEquals("Moderate", LiveStats.thermalStatusLabel(2))
+    }
+
+    @Test fun thermalStatusLabel_severe() {
+        assertEquals("Severe", LiveStats.thermalStatusLabel(3))
+    }
+
+    @Test fun thermalStatusLabel_critical() {
+        assertEquals("Critical", LiveStats.thermalStatusLabel(4))
+    }
+
+    @Test fun thermalStatusLabel_emergency() {
+        assertEquals("Emergency", LiveStats.thermalStatusLabel(5))
+    }
+
+    @Test fun thermalStatusLabel_shutdown() {
+        assertEquals("Shutdown", LiveStats.thermalStatusLabel(6))
+    }
+
+    @Test fun thermalStatusLabel_unknown_value_returns_unknown() {
+        // Any undocumented status code should be gracefully labelled
+        assertEquals("Unknown", LiveStats.thermalStatusLabel(99))
+    }
 }

@@ -887,6 +887,39 @@ object LiveStats {
         pm?.isPowerSaveMode
     }.getOrNull()
 
+    /**
+     * Maps a raw [PowerManager.currentThermalStatus] integer to a human-readable label.
+     *
+     * Extracted as a pure function so it can be unit-tested without an Android context.
+     * Constants are stable since API 29 (Android 10):
+     *   0 = NONE, 1 = LIGHT, 2 = MODERATE, 3 = SEVERE, 4 = CRITICAL,
+     *   5 = EMERGENCY, 6 = SHUTDOWN.
+     */
+    internal fun thermalStatusLabel(status: Int): String = when (status) {
+        0 -> "None"
+        1 -> "Light"
+        2 -> "Moderate"
+        3 -> "Severe"
+        4 -> "Critical"
+        5 -> "Emergency"
+        6 -> "Shutdown"
+        else -> "Unknown"
+    }
+
+    /**
+     * Returns the system-level thermal throttling status as a human-readable string,
+     * or null when [PowerManager] is unavailable (API < 29).
+     *
+     * Values: "None", "Light", "Moderate", "Severe", "Critical", "Emergency", "Shutdown".
+     * No special permissions required.
+     */
+    fun thermalStatusStr(context: Context): String? = runCatching {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+            ?: return@runCatching null
+        if (android.os.Build.VERSION.SDK_INT < 29) return@runCatching null
+        thermalStatusLabel(pm.currentThermalStatus)
+    }.getOrNull()
+
 
     // -- Connectivity toggles ----------------------------------------------------
 

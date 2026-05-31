@@ -146,6 +146,14 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _batterySaverActive = MutableStateFlow<Boolean?>(null)
     val batterySaverActive: StateFlow<Boolean?> = _batterySaverActive.asStateFlow()
 
+    /**
+     * System thermal throttle status: "None"/"Light"/"Moderate"/"Severe"/"Critical"/
+     * "Emergency"/"Shutdown". Null on API < 29 or unavailable PowerManager.
+     * Polled each live-loop tick. No permissions required.
+     */
+    private val _thermalStatus = MutableStateFlow<String?>(null)
+    val thermalStatus: StateFlow<String?> = _thermalStatus.asStateFlow()
+
     /** Whether airplane mode is currently on. */
     private val _isAirplaneModeOn = MutableStateFlow<Boolean?>(null)
     val isAirplaneModeOn: StateFlow<Boolean?> = _isAirplaneModeOn.asStateFlow()
@@ -519,6 +527,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _screenBrightnessAuto.value = LiveStats.screenBrightnessAuto(ctx)
                 // Battery saver mode — PowerManager.isPowerSaveMode(), no permissions needed
                 _batterySaverActive.value = LiveStats.batterySaverActive(ctx)
+                // Thermal throttle status — PowerManager.getCurrentThermalStatus(), API 29+, no permissions
+                _thermalStatus.value = LiveStats.thermalStatusStr(ctx)
                 // Airplane mode — Settings.Global.AIRPLANE_MODE_ON, no permissions needed
                 _isAirplaneModeOn.value = LiveStats.isAirplaneModeOn(ctx)
                 // NFC state — NfcAdapter.getDefaultAdapter, null when no NFC hardware
