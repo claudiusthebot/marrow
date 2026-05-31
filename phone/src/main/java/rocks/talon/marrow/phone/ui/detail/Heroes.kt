@@ -906,6 +906,8 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
     val screenBrightnessAuto by vm.screenBrightnessAuto.collectAsState()
     val lightLux by vm.lightLux.collectAsState()
     val screenRefreshRateHz by vm.screenRefreshRateHz.collectAsState()
+    val isDarkMode by vm.isDarkMode.collectAsState()
+    val isAutoRotateEnabled by vm.isAutoRotateEnabled.collectAsState()
     val res = section.rows.firstOrNull { it.label == "Resolution" }?.value ?: "—"
     val dpi = section.rows.firstOrNull { it.label == "Density" }?.value ?: "—"
     val refresh = section.rows.firstOrNull { it.label == "Refresh rate" }?.value ?: "—"
@@ -973,6 +975,16 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
             if (rateHz != null) {
                 Spacer(Modifier.height(4.dp))
                 BigStat("Refresh", "%.0f Hz".format(rateHz))
+            }
+            val dark = isDarkMode
+            if (dark != null) {
+                Spacer(Modifier.height(4.dp))
+                BigStat("Theme", if (dark) "Dark" else "Light")
+            }
+            val autoRotate = isAutoRotateEnabled
+            if (autoRotate != null) {
+                Spacer(Modifier.height(4.dp))
+                BigStat("Rotation", if (autoRotate) "Auto" else "Locked")
             }
         }
     }

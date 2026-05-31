@@ -317,6 +317,19 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _dndMode = MutableStateFlow<String?>(null)
     val dndMode: StateFlow<String?> = _dndMode.asStateFlow()
 
+    // -- Display mode ------------------------------------------------------------
+
+    /** Whether the system is currently in dark mode. Reads [android.content.res.Configuration.uiMode].
+     *  null on exception (should not occur in practice). Polled each live-loop tick.
+     *  No permissions required. */
+    private val _isDarkMode = MutableStateFlow<Boolean?>(null)
+    val isDarkMode: StateFlow<Boolean?> = _isDarkMode.asStateFlow()
+
+    /** Whether auto-rotate is enabled. Reads [android.provider.Settings.System.ACCELEROMETER_ROTATION].
+     *  null when the setting key is absent. Polled each live-loop tick. No permissions required. */
+    private val _isAutoRotateEnabled = MutableStateFlow<Boolean?>(null)
+    val isAutoRotateEnabled: StateFlow<Boolean?> = _isAutoRotateEnabled.asStateFlow()
+
     // -- Cellular ----------------------------------------------------------------
 
     /**
@@ -497,6 +510,10 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _isMusicActive.value = LiveStats.isMusicActive(ctx)
                 // DND mode — NotificationManager.currentInterruptionFilter, no permissions needed
                 _dndMode.value = LiveStats.dndMode(ctx)
+                // Dark mode — Configuration.uiMode, no permissions needed
+                _isDarkMode.value = LiveStats.isDarkMode(ctx)
+                // Auto-rotate — Settings.System.ACCELEROMETER_ROTATION, no permissions needed
+                _isAutoRotateEnabled.value = LiveStats.isAutoRotateEnabled(ctx)
                 // Cellular stats — READ_BASIC_PHONE_STATE (normal, API 33+); null on Wi-Fi-only devices
                 _cellular.value = LiveStats.cellularInfo(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
