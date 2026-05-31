@@ -1358,6 +1358,8 @@ fun AudioHero(vm: MarrowViewModel, section: Section) {
     val mediaVolumePct by vm.mediaVolumePct.collectAsState()
     val isMusicActive by vm.isMusicActive.collectAsState()
     val dndMode by vm.dndMode.collectAsState()
+    val ringVolumePct by vm.ringVolumePct.collectAsState()
+    val alarmVolumePct by vm.alarmVolumePct.collectAsState()
 
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
@@ -1370,7 +1372,7 @@ fun AudioHero(vm: MarrowViewModel, section: Section) {
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     )
                     Text(
-                        "Ringer mode · media volume · DND · music state",
+                        "Ringer mode · media · ring · alarm volume · DND",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1402,6 +1404,14 @@ fun AudioHero(vm: MarrowViewModel, section: Section) {
                                  else MaterialTheme.colorScheme.onSurfaceVariant
                 Spacer(Modifier.height(8.dp))
                 BigStat("Music", if (music) "Playing" else "Idle", valueColor = musicColor)
+            }
+            ringVolumePct?.let { vol ->
+                Spacer(Modifier.height(8.dp))
+                BigStat("Ring Vol", "$vol%")
+            }
+            alarmVolumePct?.let { vol ->
+                Spacer(Modifier.height(8.dp))
+                BigStat("Alarm Vol", "$vol%")
             }
             dndMode?.let { mode ->
                 val dndColor = when (mode) {
