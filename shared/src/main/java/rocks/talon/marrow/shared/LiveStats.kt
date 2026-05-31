@@ -896,13 +896,16 @@ object LiveStats {
     /**
      * Whether the mobile hotspot (Wi-Fi tethering / soft AP) is currently active.
      *
-     * Reads [WifiManager.isWifiApEnabled]. The method is publicly callable without
-     * TETHER_PRIVILEGED or WRITE_SETTINGS — any app may query the current AP state.
-     * Returns null on any exception. Zero new permissions required.
+     * [WifiManager.isWifiApEnabled] is a `@hide` API since Android 8 (API 26) and is
+     * not accessible via the public SDK. Accessed via reflection — safe on minSdk 30
+     * since the method has been present in AOSP since API 8. Returns null on any
+     * exception (including reflection failures). Zero new permissions required.
      */
     fun isHotspotEnabled(context: Context): Boolean? = runCatching {
         val wm = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
-        wm.isWifiApEnabled
+        @Suppress("DiscouragedPrivateApi")
+        val m = wm.javaClass.getDeclaredMethod("isWifiApEnabled")
+        m.invoke(wm) as? Boolean ?: false
     }.getOrNull()
 
     /**
