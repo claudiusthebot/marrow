@@ -1035,6 +1035,7 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
     val networkRatePair by vm.networkRate.collectAsState()
     val (rxBps, txBps) = networkRatePair
     val wifiRssiDbm by vm.wifiRssiDbm.collectAsState()
+    val wifiSsid by vm.wifiSsid.collectAsState()
     val wifiLinkSpeedMbps by vm.wifiLinkSpeedMbps.collectAsState()
     val wifiFrequencyMhz by vm.wifiFrequencyMhz.collectAsState()
     val wifiStandard by vm.wifiStandard.collectAsState()
@@ -1060,6 +1061,9 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+            wifiSsid?.let { ssid ->
+                BigStat("Wi-Fi SSID", ssid)
             }
             val liveRssi = wifiRssiDbm
             if (liveRssi != null) {

@@ -133,6 +133,9 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     /** Device's primary IPv4 address (e.g. "192.168.1.42"). null when no active IPv4 interface. */
     private val _localIpV4 = MutableStateFlow<String?>(null)
     val localIpV4: StateFlow<String?> = _localIpV4.asStateFlow()
+
+    private val _wifiSsid = MutableStateFlow<String?>(null)
+    val wifiSsid: StateFlow<String?> = _wifiSsid.asStateFlow()
     /** Estimated time to full charge in milliseconds. -1L when discharging or unavailable. */
     private val _chargeTimeRemainingMs = MutableStateFlow(-1L)
     val chargeTimeRemainingMs: StateFlow<Long> = _chargeTimeRemainingMs.asStateFlow()
@@ -517,6 +520,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _wifiFrequencyMhz.value = LiveStats.wifiFrequencyMhz(ctx)
                 // Wi-Fi standard — 802.11n/ac/ax/be label (null when not on Wi-Fi or legacy)
                 _wifiStandard.value = LiveStats.wifiStandard(ctx)
+                // Wi-Fi SSID — ACCESS_FINE_LOCATION required (API 29+); null when not connected or permission denied
+                _wifiSsid.value = LiveStats.wifiSsid(ctx)
                 // Local IPv4 address — NetworkInterface, no permissions needed
                 _localIpV4.value = LiveStats.localIpV4()
                 // Charge time remaining — BatteryManager estimate, -1L when discharging or unavailable
