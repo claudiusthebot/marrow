@@ -10,6 +10,8 @@ import android.os.BatteryManager
 import android.os.Environment
 import android.os.StatFs
 import java.io.File
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import kotlin.math.roundToInt
 
 /**
@@ -656,6 +658,21 @@ object LiveStats {
         val freq = wm.connectionInfo?.frequency ?: return null
         return if (freq > 0) freq else null
     }
+
+    /**
+     * Returns the device's primary IPv4 address (e.g. "192.168.1.42"), or null if the
+     * device has no active non-loopback IPv4 interface.
+     *
+     * Uses [NetworkInterface.getNetworkInterfaces] which works on all API levels and
+     * does not require any permissions.
+     */
+    fun localIpV4(): String? = try {
+        NetworkInterface.getNetworkInterfaces()
+            ?.asSequence()
+            ?.flatMap { it.inetAddresses.asSequence() }
+            ?.firstOrNull { !it.isLoopbackAddress && it is Inet4Address }
+            ?.hostAddress
+    } catch (_: Exception) { null }
 
     // -- Charge time remaining --------------------------------------------------
 
