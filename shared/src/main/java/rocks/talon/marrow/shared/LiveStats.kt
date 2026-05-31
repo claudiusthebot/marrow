@@ -1038,6 +1038,32 @@ object LiveStats {
         am.isMusicActive
     }.getOrNull()
 
+    /**
+     * Current Do Not Disturb (DND) interruption filter as a user-facing label.
+     *
+     * Reads [android.app.NotificationManager.getCurrentInterruptionFilter]. Zero permissions
+     * required — the interruption filter is readable by any app without special permissions.
+     *
+     * Returns one of: "Off" (all notifications pass through),
+     * "Priority" (priority-only mode — calls/alarms from priority contacts),
+     * "Alarms" (alarms only), "Total Silence" (all sounds blocked).
+     * Returns null when [NotificationManager] is unavailable or the filter is
+     * [android.app.NotificationManager.INTERRUPTION_FILTER_UNKNOWN] (0).
+     *
+     * Phone only. Zero permissions required.
+     */
+    fun dndMode(context: Context): String? = runCatching {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE)
+            as? android.app.NotificationManager ?: return@runCatching null
+        when (nm.currentInterruptionFilter) {
+            android.app.NotificationManager.INTERRUPTION_FILTER_ALL      -> "Off"
+            android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY -> "Priority"
+            android.app.NotificationManager.INTERRUPTION_FILTER_ALARMS   -> "Alarms"
+            android.app.NotificationManager.INTERRUPTION_FILTER_NONE     -> "Total Silence"
+            else                                                          -> null
+        }
+    }.getOrNull()
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =
