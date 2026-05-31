@@ -31,7 +31,7 @@ import rocks.talon.marrow.shared.LiveStats
  *
  * - **Snapshot** for the phone (full collector dump) and watch (cached/live).
  * - **Live stats** (battery / memory / cpu / storage / cpu-temp / network / disk I/O / uptime / gpu)
- *   polled every refresh interval — used by the Device tab’s hero/strip and per-section heroes.
+ *   polled every refresh interval — used by the Device tab's hero/strip and per-section heroes.
  * - **Settings** stream from DataStore so the theme/interval react to changes.
  */
 class MarrowViewModel(app: Application) : AndroidViewModel(app) {
@@ -311,6 +311,12 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _isMusicActive = MutableStateFlow<Boolean?>(null)
     val isMusicActive: StateFlow<Boolean?> = _isMusicActive.asStateFlow()
 
+    /** Current Do Not Disturb interruption filter as a label ("Off", "Priority", "Alarms",
+     *  "Total Silence"). null when [NotificationManager] is unavailable or filter is unknown.
+     *  Polled each live-loop tick. No permissions required. */
+    private val _dndMode = MutableStateFlow<String?>(null)
+    val dndMode: StateFlow<String?> = _dndMode.asStateFlow()
+
     // -- Cellular ----------------------------------------------------------------
 
     /**
@@ -489,6 +495,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _ringerMode.value = LiveStats.ringerMode(ctx)
                 _mediaVolumePct.value = LiveStats.mediaVolumePct(ctx)
                 _isMusicActive.value = LiveStats.isMusicActive(ctx)
+                // DND mode — NotificationManager.currentInterruptionFilter, no permissions needed
+                _dndMode.value = LiveStats.dndMode(ctx)
                 // Cellular stats — READ_BASIC_PHONE_STATE (normal, API 33+); null on Wi-Fi-only devices
                 _cellular.value = LiveStats.cellularInfo(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
