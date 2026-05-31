@@ -369,6 +369,16 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                     ThermalZoneRow(zone)
                 }
             }
+            // CPU load summary tile — phone only, shown after second tick (first tick yields -1f)
+            if (!isWatch && cpuUsage >= 0f) {
+                Spacer(Modifier.height(16.dp))
+                val loadColor = when {
+                    cpuUsage >= 90f -> Color(0xFFE53935)   // red — very high
+                    cpuUsage >= 70f -> Color(0xFFFFA726)   // orange — elevated
+                    else -> MaterialTheme.colorScheme.primary
+                }
+                BigStat("CPU Load", "${cpuUsage.toInt()}%", valueColor = loadColor)
+            }
             if (abis.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
                 FlowRow(
