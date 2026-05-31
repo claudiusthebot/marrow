@@ -62,6 +62,7 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val battery by vm.battery.collectAsState()
     val uptimeSeconds by vm.systemUptimeSeconds.collectAsState()
     val deepSleepPct by vm.deepSleepFractionPct.collectAsState()
+    val thermalStatus by vm.thermalStatus.collectAsState()
     val chargeEtaMs by vm.chargeTimeRemainingMs.collectAsState()
     val batterySaverActive by vm.batterySaverActive.collectAsState()
     val percent = if (isWatch) {
@@ -221,6 +222,17 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                 if (!isWatch && saverActive != null) {
                     Spacer(Modifier.height(8.dp))
                     BigStat("Saver", if (saverActive) "On" else "Off")
+                }
+                val throttle = thermalStatus
+                if (!isWatch && throttle != null) {
+                    Spacer(Modifier.height(8.dp))
+                    val throttleColor = when (throttle) {
+                        "None"     -> Color(0xFF66BB6A) // green — no constraint
+                        "Light",
+                        "Moderate" -> Color(0xFFFFA726) // amber — some throttling
+                        else       -> Color(0xFFE53935) // red  — Severe/Critical/Emergency/Shutdown
+                    }
+                    BigStat("Throttle", throttle, valueColor = throttleColor)
                 }
             }
         }
