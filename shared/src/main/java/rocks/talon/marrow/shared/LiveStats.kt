@@ -603,6 +603,37 @@ object LiveStats {
         }
     }
 
+    // -- Deep sleep --------------------------------------------------------------
+
+    /**
+     * Fraction of boot time the device has spent in deep sleep (0..100).
+     *
+     * Pure helper, testable without Android runtime. Pass:
+     *   [elapsedMs] — [android.os.SystemClock.elapsedRealtime] (includes deep sleep)
+     *   [uptimeMs]  — [android.os.SystemClock.uptimeMillis] (excludes deep sleep)
+     *
+     * Returns -1 when [elapsedMs] is zero.
+     */
+    internal fun deepSleepFractionPct(elapsedMs: Long, uptimeMs: Long): Int {
+        if (elapsedMs <= 0L) return -1
+        val sleepMs = (elapsedMs - uptimeMs).coerceAtLeast(0L)
+        return ((sleepMs * 100L) / elapsedMs).coerceIn(0L, 100L).toInt()
+    }
+
+    /**
+     * Fraction of boot time the device has spent in deep sleep (0..100).
+     *
+     * Uses [android.os.SystemClock.elapsedRealtime] (includes deep sleep) minus
+     * [android.os.SystemClock.uptimeMillis] (excludes deep sleep). No permissions
+     * required — both clocks are always available on Android. Returns -1 only when
+     * elapsedRealtime() is zero (impossible on a live device, guards robustness).
+     */
+    fun deepSleepFractionPct(): Int =
+        deepSleepFractionPct(
+            android.os.SystemClock.elapsedRealtime(),
+            android.os.SystemClock.uptimeMillis(),
+        )
+
     // -- Wi-Fi signal strength --------------------------------------------------
 
     /**

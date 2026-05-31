@@ -61,6 +61,7 @@ private val HERO_RADIUS = RoundedCornerShape(32.dp)
 fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val battery by vm.battery.collectAsState()
     val uptimeSeconds by vm.systemUptimeSeconds.collectAsState()
+    val deepSleepPct by vm.deepSleepFractionPct.collectAsState()
     val chargeEtaMs by vm.chargeTimeRemainingMs.collectAsState()
     val batterySaverActive by vm.batterySaverActive.collectAsState()
     val percent = if (isWatch) {
@@ -207,6 +208,10 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                 if (!isWatch && uptimeSeconds > 0L) {
                     Spacer(Modifier.height(8.dp))
                     BigStat("Uptime", LiveStats.formatUptime(uptimeSeconds))
+                }
+                if (!isWatch && deepSleepPct >= 0) {
+                    Spacer(Modifier.height(8.dp))
+                    BigStat("Sleep", "$deepSleepPct%")
                 }
                 if (!isWatch && charging && chargeEtaMs > 0L) {
                     Spacer(Modifier.height(8.dp))

@@ -478,4 +478,26 @@ class LiveStatsTest {
         // 5 400 000 ms = 1 hour 30 minutes
         assertEquals("1h 30m", LiveStats.formatScreenTimeout(5_400_000))
     }
+
+    // ── deepSleepFractionPct ───────────────────────────────────────────────────
+
+    @Test fun deepSleepFractionPct_no_sleep() {
+        // elapsed == uptime → device never slept → 0%
+        assertEquals(0, LiveStats.deepSleepFractionPct(10_000L, 10_000L))
+    }
+
+    @Test fun deepSleepFractionPct_half_sleep() {
+        // 5s asleep out of 10s uptime → 50%
+        assertEquals(50, LiveStats.deepSleepFractionPct(10_000L, 5_000L))
+    }
+
+    @Test fun deepSleepFractionPct_mostly_sleep() {
+        // 9s asleep out of 10s uptime → 90% (overnight on shelf)
+        assertEquals(90, LiveStats.deepSleepFractionPct(10_000L, 1_000L))
+    }
+
+    @Test fun deepSleepFractionPct_zero_elapsed_returns_minus_one() {
+        // Guard against division by zero / uninitialized clocks
+        assertEquals(-1, LiveStats.deepSleepFractionPct(0L, 0L))
+    }
 }

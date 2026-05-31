@@ -91,6 +91,9 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _systemUptimeSeconds = MutableStateFlow(0L)
     val systemUptimeSeconds: StateFlow<Long> = _systemUptimeSeconds.asStateFlow()
 
+    private val _deepSleepFractionPct = MutableStateFlow(-1)
+    val deepSleepFractionPct: StateFlow<Int> = _deepSleepFractionPct.asStateFlow()
+
     /** Total CPU utilisation as a percentage (0–100f).
      *  -1f until the second live-loop tick provides a /proc/stat delta.
      *  Returns -1f on emulators or devices with restricted SELinux policy. */
@@ -473,6 +476,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 if (diskSnap != null) prevDiskSnapshot = diskSnap
                 // System uptime — cheap file read, no permissions needed
                 _systemUptimeSeconds.value = LiveStats.systemUptimeSeconds()
+                // Deep sleep fraction — SystemClock delta, no permissions
+                _deepSleepFractionPct.value = LiveStats.deepSleepFractionPct()
                 // CPU utilisation — two-snapshot /proc/stat delta (same pattern as disk/network)
                 val cpuStat = LiveStats.cpuStatSnapshot()
                 val prevCpu = prevCpuStat
