@@ -143,6 +143,17 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _batterySaverActive = MutableStateFlow<Boolean?>(null)
     val batterySaverActive: StateFlow<Boolean?> = _batterySaverActive.asStateFlow()
 
+    /** Whether the system is currently in dark mode. Reflects the effective uiMode so battery-saver
+     *  and scheduled dark mode are captured correctly. Polled each live-loop tick. No permissions. */
+    private val _isDarkMode = MutableStateFlow<Boolean?>(null)
+    val isDarkMode: StateFlow<Boolean?> = _isDarkMode.asStateFlow()
+
+    /** Whether auto-rotate (accelerometer rotation) is currently enabled.
+     *  Reads Settings.System.ACCELEROMETER_ROTATION. null when unavailable (rare).
+     *  Polled each live-loop tick. No permissions required. */
+    private val _isAutoRotateEnabled = MutableStateFlow<Boolean?>(null)
+    val isAutoRotateEnabled: StateFlow<Boolean?> = _isAutoRotateEnabled.asStateFlow()
+
     /** Whether airplane mode is currently on. */
     private val _isAirplaneModeOn = MutableStateFlow<Boolean?>(null)
     val isAirplaneModeOn: StateFlow<Boolean?> = _isAirplaneModeOn.asStateFlow()
@@ -478,6 +489,10 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _screenBrightnessAuto.value = LiveStats.screenBrightnessAuto(ctx)
                 // Battery saver mode — PowerManager.isPowerSaveMode(), no permissions needed
                 _batterySaverActive.value = LiveStats.batterySaverActive(ctx)
+                // Dark mode — Configuration.uiMode, no permissions needed
+                _isDarkMode.value = LiveStats.isDarkMode(ctx)
+                // Auto-rotate — Settings.System.ACCELEROMETER_ROTATION, no permissions needed
+                _isAutoRotateEnabled.value = LiveStats.isAutoRotateEnabled(ctx)
                 // Airplane mode — Settings.Global.AIRPLANE_MODE_ON, no permissions needed
                 _isAirplaneModeOn.value = LiveStats.isAirplaneModeOn(ctx)
                 // NFC state — NfcAdapter.getDefaultAdapter, null when no NFC hardware
