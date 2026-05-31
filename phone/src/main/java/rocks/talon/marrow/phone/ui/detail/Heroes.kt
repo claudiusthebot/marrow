@@ -908,6 +908,7 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
     val screenRefreshRateHz by vm.screenRefreshRateHz.collectAsState()
     val isDarkMode by vm.isDarkMode.collectAsState()
     val isAutoRotateEnabled by vm.isAutoRotateEnabled.collectAsState()
+    val screenTimeoutMs by vm.screenTimeoutMs.collectAsState()
     val res = section.rows.firstOrNull { it.label == "Resolution" }?.value ?: "—"
     val dpi = section.rows.firstOrNull { it.label == "Density" }?.value ?: "—"
     val refresh = section.rows.firstOrNull { it.label == "Refresh rate" }?.value ?: "—"
@@ -986,6 +987,11 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
                 Spacer(Modifier.height(4.dp))
                 BigStat("Rotation", if (autoRotate) "Auto" else "Locked")
             }
+            val timeoutMs = screenTimeoutMs
+            if (timeoutMs != null) {
+                Spacer(Modifier.height(4.dp))
+                BigStat("Timeout", LiveStats.formatScreenTimeout(timeoutMs))
+            }
         }
     }
 }
@@ -1009,6 +1015,7 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
     val isAirplaneModeOn by vm.isAirplaneModeOn.collectAsState()
     val isNfcEnabled by vm.isNfcEnabled.collectAsState()
     val isBluetoothEnabled by vm.isBluetoothEnabled.collectAsState()
+    val isHotspotEnabled by vm.isHotspotEnabled.collectAsState()
     val isVpnActive by vm.isVpnActive.collectAsState()
     val totalRxBytes by vm.totalRxBytes.collectAsState()
     val totalTxBytes by vm.totalTxBytes.collectAsState()
@@ -1092,6 +1099,14 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
                 val btColor = if (btOn) MaterialTheme.colorScheme.primary
                               else MaterialTheme.colorScheme.onSurface
                 BigStat("Bluetooth", if (btOn) "On" else "Off", valueColor = btColor)
+            }
+            // Hotspot state — WifiManager.isWifiApEnabled(), zero permissions
+            val hotspotOn = isHotspotEnabled
+            if (hotspotOn != null) {
+                Spacer(Modifier.height(8.dp))
+                val hotspotColor = if (hotspotOn) MaterialTheme.colorScheme.primary
+                                   else MaterialTheme.colorScheme.onSurface
+                BigStat("Hotspot", if (hotspotOn) "On" else "Off", valueColor = hotspotColor)
             }
             // VPN state — NetworkCapabilities.TRANSPORT_VPN, zero extra permissions
             val vpnOn = isVpnActive

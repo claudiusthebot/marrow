@@ -155,6 +155,12 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _isBluetoothEnabled = MutableStateFlow<Boolean?>(null)
     val isBluetoothEnabled: StateFlow<Boolean?> = _isBluetoothEnabled.asStateFlow()
 
+    /** Whether the mobile hotspot (Wi-Fi tethering) is currently active.
+     *  Reads [android.net.wifi.WifiManager.isWifiApEnabled] — zero permissions required.
+     *  null before first live-loop tick or on any exception. */
+    private val _isHotspotEnabled = MutableStateFlow<Boolean?>(null)
+    val isHotspotEnabled: StateFlow<Boolean?> = _isHotspotEnabled.asStateFlow()
+
     /** Whether a VPN tunnel is currently active. Checked via NetworkCapabilities.TRANSPORT_VPN.
      *  null when ConnectivityManager is unavailable; false when no active network. */
     private val _isVpnActive = MutableStateFlow<Boolean?>(null)
@@ -330,6 +336,11 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _isAutoRotateEnabled = MutableStateFlow<Boolean?>(null)
     val isAutoRotateEnabled: StateFlow<Boolean?> = _isAutoRotateEnabled.asStateFlow()
 
+    /** Screen-off timeout in milliseconds from [android.provider.Settings.System.SCREEN_OFF_TIMEOUT].
+     *  null when the key is absent or before first live-loop tick. No permissions required. */
+    private val _screenTimeoutMs = MutableStateFlow<Int?>(null)
+    val screenTimeoutMs: StateFlow<Int?> = _screenTimeoutMs.asStateFlow()
+
     // -- Cellular ----------------------------------------------------------------
 
     /**
@@ -497,6 +508,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _isNfcEnabled.value = LiveStats.isNfcEnabled(ctx)
                 // Bluetooth state — Settings.Global "bluetooth_on", zero permissions
                 _isBluetoothEnabled.value = LiveStats.isBluetoothEnabled(ctx)
+                // Hotspot state — WifiManager.isWifiApEnabled(), no permissions needed
+                _isHotspotEnabled.value = LiveStats.isHotspotEnabled(ctx)
                 // VPN state — NetworkCapabilities.TRANSPORT_VPN, no extra permissions
                 _isVpnActive.value = LiveStats.isVpnActive(ctx)
                 // Network traffic totals since boot — TrafficStats, polled, no permissions needed
@@ -514,6 +527,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _isDarkMode.value = LiveStats.isDarkMode(ctx)
                 // Auto-rotate — Settings.System.ACCELEROMETER_ROTATION, no permissions needed
                 _isAutoRotateEnabled.value = LiveStats.isAutoRotateEnabled(ctx)
+                // Screen timeout — Settings.System.SCREEN_OFF_TIMEOUT, no permissions needed
+                _screenTimeoutMs.value = LiveStats.screenTimeoutMs(ctx)
                 // Cellular stats — READ_BASIC_PHONE_STATE (normal, API 33+); null on Wi-Fi-only devices
                 _cellular.value = LiveStats.cellularInfo(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L

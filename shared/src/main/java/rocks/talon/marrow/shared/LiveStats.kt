@@ -799,6 +799,35 @@ object LiveStats {
         ) == 1
     } catch (_: Settings.SettingNotFoundException) { null }
 
+    /**
+     * Screen-off timeout in milliseconds from [Settings.System.SCREEN_OFF_TIMEOUT].
+     *
+     * Common values: 15 000 (15 s), 30 000 (30 s), 60 000 (1 m), 120 000 (2 m),
+     * 300 000 (5 m), 600 000 (10 m), 1 800 000 (30 m). Returns null when the key
+     * is absent (should not occur on standard Android) or the raw value is ≤ 0.
+     * No permissions required.
+     */
+    fun screenTimeoutMs(context: Context): Int? {
+        val ms = Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, -1)
+        return if (ms > 0) ms else null
+    }
+
+    /**
+     * Formats a screen-off timeout in milliseconds as a concise human-readable string.
+     *
+     * Examples: 30 000 → "30s", 90 000 → "1m 30s", 120 000 → "2m", 3 600 000 → "1h 0m".
+     * Exposed as a pure function for unit testability.
+     */
+    fun formatScreenTimeout(ms: Int): String = when {
+        ms < 60_000 -> "${ms / 1000}s"
+        ms < 3_600_000 -> {
+            val m = ms / 60_000
+            val s = (ms % 60_000) / 1000
+            if (s == 0) "${m}m" else "${m}m ${s}s"
+        }
+        else -> "${ms / 3_600_000}h ${(ms % 3_600_000) / 60_000}m"
+    }
+
     // -- Display refresh rate ---------------------------------------------------
 
     /**
@@ -862,6 +891,21 @@ object LiveStats {
         Settings.Global.getInt(context.contentResolver, "bluetooth_on", -1)
             .takeIf { it >= 0 }
             ?.let { it != 0 }
+    }.getOrNull()
+
+    /**
+     * Whether the mobile hotspot (Wi-Fi tethering / soft AP) is currently active.
+     *
+     * [WifiManager.isWifiApEnabled] is a `@hide` API since Android 8 (API 26) and is
+     * not accessible via the public SDK. Accessed via reflection — safe on minSdk 30
+     * since the method has been present in AOSP since API 8. Returns null on any
+     * exception (including reflection failures). Zero new permissions required.
+     */
+    fun isHotspotEnabled(context: Context): Boolean? = runCatching {
+        val wm = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        @Suppress("DiscouragedPrivateApi")
+        val m = wm.javaClass.getDeclaredMethod("isWifiApEnabled")
+        m.invoke(wm) as? Boolean ?: false
     }.getOrNull()
 
     /**
