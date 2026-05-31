@@ -448,4 +448,34 @@ class LiveStatsTest {
         val b = makeBattery(voltageV = 3.9f, currentMa = 0)
         assertEquals(0, b.powerMw)
     }
+
+    // ── formatScreenTimeout ────────────────────────────────────────────────────
+
+    @Test fun formatScreenTimeout_seconds() {
+        assertEquals("30s", LiveStats.formatScreenTimeout(30_000))
+    }
+
+    @Test fun formatScreenTimeout_fifteen_seconds() {
+        assertEquals("15s", LiveStats.formatScreenTimeout(15_000))
+    }
+
+    @Test fun formatScreenTimeout_minutes_exact() {
+        // Exactly 2 minutes with no leftover seconds → "2m"
+        assertEquals("2m", LiveStats.formatScreenTimeout(120_000))
+    }
+
+    @Test fun formatScreenTimeout_minutes_and_seconds() {
+        // 90 000 ms = 1 min 30 s
+        assertEquals("1m 30s", LiveStats.formatScreenTimeout(90_000))
+    }
+
+    @Test fun formatScreenTimeout_hours_zero_minutes() {
+        // Exactly 1 hour → "1h 0m"
+        assertEquals("1h 0m", LiveStats.formatScreenTimeout(3_600_000))
+    }
+
+    @Test fun formatScreenTimeout_hours_and_minutes() {
+        // 5 400 000 ms = 1 hour 30 minutes
+        assertEquals("1h 30m", LiveStats.formatScreenTimeout(5_400_000))
+    }
 }
