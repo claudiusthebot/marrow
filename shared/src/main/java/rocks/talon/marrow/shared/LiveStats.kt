@@ -770,6 +770,35 @@ object LiveStats {
         null
     }
 
+    /**
+     * Whether the system is currently in dark mode (Night theme active).
+     *
+     * Reads [android.content.res.Configuration.uiMode] from the app's resources,
+     * which reflects the current effective night mode state. Returns true when dark
+     * mode is active, false when light mode is active.
+     *
+     * No permissions required. Available on all API levels.
+     */
+    fun isDarkMode(context: Context): Boolean? = try {
+        (context.resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+    } catch (_: Exception) { null }
+
+    /**
+     * Whether auto-rotate (orientation sensor control) is enabled.
+     *
+     * Reads [Settings.System.ACCELEROMETER_ROTATION]: 1 = auto-rotate on,
+     * 0 = orientation locked. Same zero-permission approach as
+     * [screenBrightnessAuto] — [Settings.System] is world-readable.
+     */
+    fun isAutoRotateEnabled(context: Context): Boolean? = try {
+        Settings.System.getInt(
+            context.contentResolver,
+            Settings.System.ACCELEROMETER_ROTATION,
+        ) == 1
+    } catch (_: Settings.SettingNotFoundException) { null }
+
     // -- Display refresh rate ---------------------------------------------------
 
     /**
