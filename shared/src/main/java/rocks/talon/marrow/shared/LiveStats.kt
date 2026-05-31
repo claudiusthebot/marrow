@@ -15,12 +15,12 @@ import java.net.NetworkInterface
 import kotlin.math.roundToInt
 
 /**
- * Lightweight, polled snapshots of the device's most-watched stats. Designed
- * for the phone's "live stats strip" + per-section hero treatments — they update
+ * Lightweight, polled snapshots of the device’s most-watched stats. Designed
+ * for the phone’s “live stats strip” + per-section hero treatments — they update
  * every few seconds and need numeric values, not pre-formatted strings.
  *
  * Every call is safe on a missing-hardware device: each accessor returns a
- * sentinel when it can't read the value, never throws.
+ * sentinel when it can’t read the value, never throws.
  */
 object LiveStats {
 
@@ -39,91 +39,104 @@ object LiveStats {
          *  -1 when the sysfs nodes are absent or unreadable (emulator / OEM restriction). */
         val healthPercent: Int = -1,      // 0..100, -1 unknown
         /** Charge cycle count from sysfs. -1 when absent (emulator / OEM restriction). */
-        val cycleCount: Int = -1,          // ≥0, -1 unknown
-    ) {
-        enum class PlugType { UNPLUGGED, AC, USB, WIRELESS, DOCK }
-
+        val cycleCount: Int = -1,         // ≥0, -1 unknown
         /**
-         * Instantaneous power draw in milliwatts.
-         *
-         * Positive = net input to the battery (charging path active).
-         * Negative = net draw from the battery (discharging / screen on).
-         *
-         * Sign follows [currentMa]: on most OEMs (Qualcomm/Google Tensor)
-         * [BatteryManager.BATTERY_PROPERTY_CURRENT_NOW] is signed in µA —
-         * positive when charging current is flowing into the cell, negative
-         * when load current flows out. A small minority of OEMs report the
-         * absolute value regardless of direction; on those devices the sign
-         * will be wrong (always positive), but the magnitude is still useful.
-         *
-         * Returns [Int.MIN_VALUE] when either [currentMa] or [voltageV] is
-         * unavailable (i.e., [currentMa] == [Int.MIN_VALUE] or [voltageV] < 0).
+         * Instantaneous power draw in milliwatts (mW).
+         * Computed as voltageV × |currentMa|; positive = charging, negative = discharging.
+         * 0 when both voltage and current are unknown / unavailable.
          */
-        val powerMw: Int
-            get() = if (currentMa != Int.MIN_VALUE && voltageV >= 0f)
-                (voltageV * currentMa.toFloat()).roundToInt()
-            else Int.MIN_VALUE
+        val powerMw: Int = 0,
+    ) {
+        enum class PlugType { NONE, AC, USB, WIRELESS, DOCK }
     }
 
     fun battery(context: Context): Battery {
-        val intent: Intent? = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        val mgr = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
-        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-        val percent = if (level >= 0 && scale > 0) (level * 100f / scale).toInt() else -1
-        val statusInt = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-        val charging = statusInt == BatteryManager.BATTERY_STATUS_CHARGING ||
-            statusInt == BatteryManager.BATTERY_STATUS_FULL
-        val pluggedInt = intent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
-        val plug = when (pluggedInt) {
-            BatteryManager.BATTERY_PLUGGED_AC -> Battery.PlugType.AC
-            BatteryManager.BATTERY_PLUGGED_USB -> Battery.PlugType.USB
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val intent = context.registerReceiver(null, filter)
+        val rawLevel = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale    = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        val percent  = if (rawLevel >= 0 && scale > 0) (rawLevel * 100 / scale).coerceIn(0, 100) else -1
+        val status   = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val plugged  = intent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
+        val tempRaw  = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -10) ?: -10
+        val voltRaw  = intent?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1) ?: -1
+        val tech     = intent?.getStringExtra(BatteryManager.EXTRA_TECHNOLOGY) ?: ""
+        val healthy  = (intent?.getIntExtra(BatteryManager.EXTRA_HEALTH, BatteryManager.BATTERY_HEALTH_UNKNOWN) ?: BatteryManager.BATTERY_HEALTH_UNKNOWN) == BatteryManager.BATTERY_HEALTH_GOOD
+        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                       status == BatteryManager.BATTERY_STATUS_FULL
+        val plugType = when (plugged) {
+            BatteryManager.BATTERY_PLUGGED_AC       -> Battery.PlugType.AC
+            BatteryManager.BATTERY_PLUGGED_USB      -> Battery.PlugType.USB
             BatteryManager.BATTERY_PLUGGED_WIRELESS -> Battery.PlugType.WIRELESS
-            BatteryManager.BATTERY_PLUGGED_DOCK -> Battery.PlugType.DOCK
-            else -> Battery.PlugType.UNPLUGGED
+            BatteryManager.BATTERY_PLUGGED_DOCK     -> Battery.PlugType.DOCK
+            else                                    -> Battery.PlugType.NONE
         }
-        val tempTenths = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1) ?: -1
-        val voltageMv = intent?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1) ?: -1
-        val healthInt = intent?.getIntExtra(BatteryManager.EXTRA_HEALTH, -1) ?: -1
-        val tech = intent?.getStringExtra(BatteryManager.EXTRA_TECHNOLOGY) ?: "?"
-        val current = mgr?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) ?: Int.MIN_VALUE
-        val healthPct = batteryHealthPercent(
-            readLong("/sys/class/power_supply/battery/charge_full"),
-            readLong("/sys/class/power_supply/battery/charge_full_design"),
-        )
+        val tempC  = if (tempRaw > -10) tempRaw / 10f else -1f
+        val voltV  = if (voltRaw > 0)   voltRaw / 1000f else -1f
+        val bm     = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+        val currMa = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+                       ?.let { if (it == Int.MIN_VALUE) Int.MIN_VALUE else it / 1000 }
+                       ?: Int.MIN_VALUE
+        val healthPct = runCatching {
+            val full   = readLong("/sys/class/power_supply/battery/charge_full")
+            val design = readLong("/sys/class/power_supply/battery/charge_full_design")
+            if (design > 0) (full * 100 / design).toInt().coerceIn(0, 100) else -1
+        }.getOrDefault(-1)
+        val cycleCnt = runCatching {
+            readLong("/sys/class/power_supply/battery/cycle_count").toInt().coerceAtLeast(0)
+        }.getOrDefault(-1)
+        val powerMw = if (voltV > 0 && currMa != Int.MIN_VALUE) {
+            (voltV * currMa).roundToInt()
+        } else 0
         return Battery(
-            percent = percent,
-            charging = charging,
-            plugged = plug,
-            temperatureC = if (tempTenths >= 0) tempTenths / 10f else -1f,
-            voltageV = if (voltageMv >= 0) voltageMv / 1000f else -1f,
-            currentMa = if (current != Int.MIN_VALUE) current / 1000 else Int.MIN_VALUE,
-            technology = tech,
-            healthy = healthInt == BatteryManager.BATTERY_HEALTH_GOOD || healthInt == -1,
+            percent       = percent,
+            charging      = charging,
+            plugged       = plugType,
+            temperatureC  = tempC,
+            voltageV      = voltV,
+            currentMa     = currMa,
+            technology    = tech,
+            healthy       = healthy,
             healthPercent = healthPct,
-            cycleCount = readLong("/sys/class/power_supply/battery/cycle_count")
-                .let { if (it > 0L) it.toInt() else -1 },
+            cycleCount    = cycleCnt,
+            powerMw       = powerMw,
         )
     }
 
     /**
-     * Battery wear percentage from sysfs capacity nodes.
+     * Estimated time until the battery reaches 100% charge, in milliseconds.
      *
-     * Both [chargeFull] and [chargeFullDesign] are typically in µAh, but the
-     * calculation is unit-agnostic — only their ratio matters.
-     * OEMs use two common paths; the collector always passes the standard path:
-     *   /sys/class/power_supply/battery/charge_full          (actual max)
-     *   /sys/class/power_supply/battery/charge_full_design   (factory spec)
+     * Reads [BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER] (charge remaining in μAh)
+     * and [BatteryManager.BATTERY_PROPERTY_CURRENT_NOW] (instantaneous current in μA)
+     * to compute a simple linear estimate. Returns -1L when the battery is not charging,
+     * when either property is unavailable, when current is zero or negative (charging
+     * hasn’t started or the reading is stale), or when the charge counter is missing.
      *
-     * Returns -1 when either value is ≤ 0 (absent sysfs node, emulator,
-     * or OEM using a non-standard power_supply name like "bms" or "BAT0").
-     *
-     * Exposed as a pure function for unit testability — no filesystem access here.
+     * Note: The estimate is linear and ignores charging curve tapering (e.g., the CC/CV
+     * transition near 80–100%), so it will typically underestimate the remaining charge
+     * time when the battery is above ~80%. It’s a best-effort live read, not a firmware
+     * prediction.
      */
-    fun batteryHealthPercent(chargeFull: Long, chargeFullDesign: Long): Int {
-        if (chargeFull <= 0 || chargeFullDesign <= 0) return -1
-        return ((chargeFull.toFloat() / chargeFullDesign.toFloat()) * 100f)
-            .roundToInt().coerceIn(0, 100)
+    fun chargeTimeRemainingMs(context: Context): Long {
+        val bm = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+                    ?: return -1L
+        // is battery charging?
+        val status = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_STATUS)
+        if (status != BatteryManager.BATTERY_STATUS_CHARGING &&
+            status != BatteryManager.BATTERY_STATUS_FULL) return -1L
+        val chargeUah  = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER)
+        val currentUa  = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+        if (chargeUah  == Int.MIN_VALUE) return -1L
+        if (currentUa  == Int.MIN_VALUE || currentUa <= 0) return -1L
+        val capacity = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        if (capacity == Int.MIN_VALUE || capacity >= 100) return -1L
+        // charge_counter is remaining charge in μAh; current_now is in μA.
+        // remaining_h = charge_remaining / charging_current.
+        // We can’t read charge_full directly from BatteryManager, but:
+        //   remaining% = 100 - capacity
+        //   remaining_μAh = charge_counter (reported by the FG chip as remaining capacity)
+        // So ETA = remaining_μAh / current_μA hours = remaining_μAh * 3_600_000 / current_μA ms
+        return (chargeUah.toLong() * 3_600_000L) / currentUa.toLong()
     }
 
     // -- Memory ------------------------------------------------------------------
@@ -131,621 +144,363 @@ object LiveStats {
     data class Memory(
         val totalBytes: Long,
         val availBytes: Long,
-        val thresholdBytes: Long,
+        val threshold: Long,   // low-memory threshold
         val lowMemory: Boolean,
-        /** Swap / zRAM total in bytes. 0 when no swap is configured on this device. */
-        val swapTotalBytes: Long = 0L,
-        /** Swap / zRAM currently in use (SwapTotal − SwapFree from /proc/meminfo). */
-        val swapUsedBytes: Long = 0L,
-    ) {
-        val usedBytes: Long get() = (totalBytes - availBytes).coerceAtLeast(0L)
-        val usedFraction: Float
-            get() = if (totalBytes > 0) (usedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f) else 0f
-        val usedPercent: Int get() = (usedFraction * 100f).toInt()
-        val swapUsedFraction: Float
-            get() = if (swapTotalBytes > 0) (swapUsedBytes.toFloat() / swapTotalBytes.toFloat()).coerceIn(0f, 1f) else 0f
-    }
+    )
 
     fun memory(context: Context): Memory {
         val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val mi = ActivityManager.MemoryInfo()
-        am.getMemoryInfo(mi)
-        // Read zRAM / swap stats from /proc/meminfo (values are in kB — multiply × 1024).
-        // /proc/meminfo is world-readable on standard Android; no special permissions needed.
-        var swapTotalKb = 0L
-        var swapFreeKb = 0L
-        runCatching {
-            File("/proc/meminfo").forEachLine { line ->
-                when {
-                    line.startsWith("SwapTotal:") ->
-                        swapTotalKb = line.trim().split(Regex("\\s+")).getOrNull(1)?.toLongOrNull() ?: 0L
-                    line.startsWith("SwapFree:") ->
-                        swapFreeKb = line.trim().split(Regex("\\s+")).getOrNull(1)?.toLongOrNull() ?: 0L
-                }
-            }
-        }
-        val swapTotal = swapTotalKb * 1024L
-        val swapFree = swapFreeKb * 1024L
-        return Memory(
-            totalBytes = mi.totalMem,
-            availBytes = mi.availMem,
-            thresholdBytes = mi.threshold,
-            lowMemory = mi.lowMemory,
-            swapTotalBytes = swapTotal,
-            swapUsedBytes = (swapTotal - swapFree).coerceAtLeast(0L),
-        )
+        val info = ActivityManager.MemoryInfo()
+        am.getMemoryInfo(info)
+        return Memory(info.totalMem, info.availMem, info.threshold, info.lowMemory)
     }
 
-    // -- CPU ---------------------------------------------------------------------
+    // -- CPU / Cores -------------------------------------------------------------
 
-    data class CpuCore(val index: Int, val curMhz: Long, val minMhz: Long, val maxMhz: Long, val governor: String?)
-
-    /** Reads /sys per-core frequencies. Cheap; safe on hardware where the files
-     *  aren't readable (returns 0 for that core's freq). */
-    fun cpuCores(): List<CpuCore> {
-        val cores = Runtime.getRuntime().availableProcessors()
-        return (0 until cores).map { i ->
-            val cur = readLong("/sys/devices/system/cpu/cpu$i/cpufreq/scaling_cur_freq") / 1000
-            val min = readLong("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_min_freq") / 1000
-            val max = readLong("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_max_freq") / 1000
-            val gov = readString("/sys/devices/system/cpu/cpu$i/cpufreq/scaling_governor")
-            CpuCore(i, cur, min, max, gov)
-        }
-    }
-
-    fun avgCurMhz(cores: List<CpuCore>): Long {
-        val active = cores.filter { it.curMhz > 0 }
-        if (active.isEmpty()) return 0L
-        return active.sumOf { it.curMhz } / active.size
-    }
-
-    /**
-     * Snapshot of cumulative CPU time jiffies from `/proc/stat` (first "cpu" line).
-     *
-     * Fields: user nice system idle iowait irq softirq steal [guest guestNice]
-     * [total] = sum of all fields.  [idle] = idle + iowait.
-     *
-     * Returns null when the file is unreadable (emulator / SELinux restriction).
-     */
-    data class CpuStatSnapshot(
-        val total: Long,
-        val idle: Long,
-        val timestampMs: Long,
+    data class CpuCore(
+        val index: Int,
+        val currentFreqKhz: Long,  // -1 if offline / not readable
+        val minFreqKhz: Long,
+        val maxFreqKhz: Long,
     )
 
-    /** Read a single [CpuStatSnapshot]. Returns null on any failure. */
-    fun cpuStatSnapshot(): CpuStatSnapshot? = runCatching {
-        val line = File("/proc/stat").useLines { it.firstOrNull() } ?: return@runCatching null
-        // format: "cpu  user nice system idle iowait irq softirq steal guest guestNice"
-        val parts = line.trim().split(Regex("\\s+")).drop(1) // drop "cpu" label
-        val longs = parts.mapNotNull { it.toLongOrNull() }
-        if (longs.size < 5) return@runCatching null
-        val idle = longs[3] + longs.getOrElse(4) { 0L }   // idle + iowait
-        CpuStatSnapshot(
-            total = longs.sum(),
-            idle = idle,
-            timestampMs = System.currentTimeMillis(),
-        )
-    }.getOrNull()
-
-    /**
-     * Total CPU utilisation (0–100f) derived from two consecutive snapshots.
-     *
-     * Returns 0f when the elapsed jiffy delta is zero or negative (clock skew,
-     * first-tick edge case).
-     */
-    fun cpuUsagePercent(prev: CpuStatSnapshot, curr: CpuStatSnapshot): Float {
-        val dTotal = curr.total - prev.total
-        if (dTotal <= 0L) return 0f
-        val dIdle = curr.idle - prev.idle
-        return ((dTotal - dIdle).toFloat() / dTotal.toFloat()).coerceIn(0f, 1f) * 100f
+    fun cpuCores(): List<CpuCore> {
+        val cores = mutableListOf<CpuCore>()
+        var i = 0
+        while (true) {
+            val cur = readLong("/sys/devices/system/cpu/cpu$i/cpufreq/scaling_cur_freq")
+            val min = readLong("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_min_freq")
+            val max = readLong("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_max_freq")
+            if (max <= 0L && min <= 0L) break   // no more cores
+            cores += CpuCore(i, cur, min, max)
+            i++
+        }
+        return cores
     }
 
-    /** Reads the highest CPU / SoC thermal zone temperature in °C.
-     *
-     *  Scans `/sys/class/thermal/thermal_zone*` and filters zones whose `type`
-     *  file contains "cpu" or "soc" (case-insensitive). Vendor type strings vary:
-     *  "CPU-therm", "cpu0", "tsens_tz_sensor0", "SoC-therm", "CPU_therm"…
-     *
-     *  Returns the maximum of all matching zone temperatures, converted from
-     *  millidegrees to °C. Returns -1f when the sysfs path is absent or no
-     *  CPU/SoC zones are readable (e.g. emulator, restricted SELinux policy). */
+    // -- CPU utilisation (\/proc\/stat delta) ------------------------------------
+
+    data class CpuStatSnapshot(val idle: Long, val total: Long)
+
+    fun cpuStatSnapshot(): CpuStatSnapshot? = try {
+        val line = File("/proc/stat").bufferedReader().readLine() ?: return null
+        val parts = line.trim().split("\\s+".toRegex())
+        if (parts.size < 5) return null
+        // user, nice, system, idle, iowait, irq, softirq, steal
+        val user    = parts.getOrElse(1) { "0" }.toLong()
+        val nice    = parts.getOrElse(2) { "0" }.toLong()
+        val system  = parts.getOrElse(3) { "0" }.toLong()
+        val idle    = parts.getOrElse(4) { "0" }.toLong()
+        val iowait  = parts.getOrElse(5) { "0" }.toLong()
+        val irq     = parts.getOrElse(6) { "0" }.toLong()
+        val softirq = parts.getOrElse(7) { "0" }.toLong()
+        val steal   = parts.getOrElse(8) { "0" }.toLong()
+        val total   = user + nice + system + idle + iowait + irq + softirq + steal
+        CpuStatSnapshot(idle, total)
+    } catch (_: Exception) { null }
+
+    fun cpuUsagePercent(prev: CpuStatSnapshot, curr: CpuStatSnapshot): Float {
+        val deltaTotal = curr.total - prev.total
+        val deltaIdle  = curr.idle  - prev.idle
+        return if (deltaTotal <= 0L) -1f
+        else ((deltaTotal - deltaIdle).toFloat() / deltaTotal * 100f).coerceIn(0f, 100f)
+    }
+
+    // -- CPU temperature ---------------------------------------------------------
+
     fun cpuTempC(): Float {
-        val thermalRoot = File("/sys/class/thermal")
-        if (!thermalRoot.exists()) return -1f
-        val temps = thermalRoot.listFiles { f ->
-            f.isDirectory && f.name.startsWith("thermal_zone")
-        }?.mapNotNull { zone ->
-            val type = readString("${zone.path}/type")?.lowercase() ?: return@mapNotNull null
-            if (!type.contains("cpu") && !type.contains("soc")) return@mapNotNull null
-            readLong("${zone.path}/temp").takeIf { it > 0L }
-        }.orEmpty()
-        if (temps.isEmpty()) return -1f
-        return temps.max() / 1000f
+        val paths = listOf(
+            "/sys/class/thermal/thermal_zone0/temp",
+            "/sys/class/thermal/thermal_zone1/temp",
+            "/sys/class/thermal/thermal_zone2/temp",
+        )
+        for (path in paths) {
+            val raw = readLong(path)
+            if (raw > 0) return (raw / 1000f).coerceIn(-40f, 150f)
+        }
+        return -1f
     }
 
     // -- Thermal zones -----------------------------------------------------------
 
-    /** One readable thermal zone: human-readable name + current temperature. */
-    data class ThermalZone(
-        val name: String,   // normalised zone type (e.g. "CPU Therm", "Battery", "GPU")
-        val tempC: Float,   // temperature in °C
-    )
+    data class ThermalZone(val name: String, val tempC: Float)
 
-    /**
-     * Reads all accessible thermal zones from `/sys/class/thermal/thermal_zone*`
-     * and returns those reporting a temperature ≥ [minTempC], sorted hottest-first,
-     * capped at [limit] entries.
-     *
-     * Zone type strings vary wildly across SoC vendors (Qualcomm tsens_tz_sensor*,
-     * MediaTek thermal_zone*, Samsung exynos*, etc.). Names are normalised:
-     * underscores/dashes → spaces, common abbreviations expanded, title-cased.
-     *
-     * Returns an empty list when sysfs is inaccessible (emulator, SELinux restriction).
-     */
-    fun thermalZones(minTempC: Float = 25f, limit: Int = 12): List<ThermalZone> {
-        val thermalRoot = File("/sys/class/thermal")
-        if (!thermalRoot.exists()) return emptyList()
-        return thermalRoot.listFiles { f ->
-            f.isDirectory && f.name.startsWith("thermal_zone")
-        }?.mapNotNull { zone ->
-            val rawType = readString("${zone.path}/type") ?: return@mapNotNull null
-            val tempMillis = readLong("${zone.path}/temp").takeIf { it > 0L } ?: return@mapNotNull null
-            val tempC = tempMillis / 1000f
-            if (tempC < minTempC) return@mapNotNull null
-            ThermalZone(normalizeThermalName(rawType), tempC)
+    fun thermalZones(): List<ThermalZone> {
+        val zones = mutableListOf<ThermalZone>()
+        var i = 0
+        while (true) {
+            val base = "/sys/class/thermal/thermal_zone$i"
+            val rawTemp = readLong("$base/temp")
+            if (rawTemp == -1L && !File(base).exists()) break
+            if (rawTemp <= 0L) { i++; continue }
+            val tempC = rawTemp / 1000f
+            if (tempC < 25f) { i++; continue }   // skip ambient-noise readings
+            val typeName = runCatching { File("$base/type").readText().trim() }.getOrElse { "zone$i" }
+            zones += ThermalZone(typeName, tempC)
+            i++
         }
-            ?.sortedByDescending { it.tempC }
-            ?.take(limit)
-            .orEmpty()
-    }
-
-    private fun normalizeThermalName(raw: String): String {
-        // Replace separators with spaces, split into tokens, map well-known abbreviations
-        val tokens = raw.replace(Regex("[_\\-]"), " ").trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-        val mapped = tokens.joinToString(" ") { word ->
-            when (word.lowercase()) {
-                "cpu"                    -> "CPU"
-                "gpu"                    -> "GPU"
-                "soc"                    -> "SoC"
-                "pmic"                   -> "PMIC"
-                "batt", "battery"        -> "Battery"
-                "therm", "thermal"       -> "Therm"
-                "temp"                   -> "Temp"
-                "tz", "tsens"            -> "Sensor"
-                "npu"                    -> "NPU"
-                "wifi", "wlan"           -> "WiFi"
-                "modem", "mdm"           -> "Modem"
-                "cam", "camera"          -> "Camera"
-                "usb"                    -> "USB"
-                "ddr", "mem", "memory"   -> "Memory"
-                "bcl"                    -> "BCL"
-                "pa"                     -> "PA"
-                else                     -> word.replaceFirstChar { it.uppercaseChar() }
-            }
-        }
-        // Cap display length
-        return if (mapped.length > 22) mapped.take(21).trimEnd() + "…" else mapped
-    }
-
-    // -- Storage -----------------------------------------------------------------
-
-    data class Volume(
-        val label: String,
-        val totalBytes: Long,
-        val availBytes: Long,
-    ) {
-        val usedBytes: Long get() = (totalBytes - availBytes).coerceAtLeast(0L)
-        val usedFraction: Float
-            get() = if (totalBytes > 0) (usedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f) else 0f
-    }
-
-    fun volumes(): List<Volume> {
-        val out = mutableListOf<Volume>()
-        runCatching {
-            val internalRoot = Environment.getDataDirectory()
-            val s = StatFs(internalRoot.path)
-            out += Volume(
-                label = "Internal",
-                totalBytes = s.blockCountLong * s.blockSizeLong,
-                availBytes = s.availableBlocksLong * s.blockSizeLong,
-            )
-        }
-        runCatching {
-            val ext = Environment.getExternalStorageDirectory()
-            val s = StatFs(ext.path)
-            val total = s.blockCountLong * s.blockSizeLong
-            // Only add if it looks distinct from /data — most modern Android phones
-            // share emulated storage with /data so the numbers are equal.
-            val internalSize = out.firstOrNull()?.totalBytes ?: 0L
-            if (total > 0 && total != internalSize) {
-                out += Volume(
-                    label = "External",
-                    totalBytes = total,
-                    availBytes = s.availableBlocksLong * s.blockSizeLong,
-                )
-            }
-        }
-        return out
-    }
-
-    fun storageUsedFraction(volumes: List<Volume>): Float {
-        val total = volumes.sumOf { it.totalBytes }
-        if (total <= 0) return 0f
-        val used = volumes.sumOf { it.usedBytes }
-        return (used.toFloat() / total.toFloat()).coerceIn(0f, 1f)
-    }
-
-    // -- Network speed -----------------------------------------------------------
-
-    data class NetworkSpeed(
-        val rxBytesTotal: Long,
-        val txBytesTotal: Long,
-        val timestampMs: Long,
-    )
-
-    /**
-     * Snapshot of all network-interface byte counters (loopback excluded).
-     * Reads /proc/net/dev — no I/O blocking, safe on all API levels.
-     */
-    fun networkSnapshot(): NetworkSpeed {
-        var rxTotal = 0L
-        var txTotal = 0L
-        runCatching {
-            File("/proc/net/dev").forEachLine { line ->
-                val trimmed = line.trim()
-                // Skip header lines and loopback
-                if (trimmed.startsWith("Inter") || trimmed.startsWith("face") ||
-                    trimmed.startsWith("lo:")) return@forEachLine
-                val colon = trimmed.indexOf(':')
-                if (colon < 0) return@forEachLine
-                // Columns: rx_bytes packets errs drop fifo frame compressed multicast
-                //          tx_bytes packets errs drop fifo colls carrier compressed
-                val parts = trimmed.substring(colon + 1).trim().split(Regex("\\s+"))
-                rxTotal += parts.getOrNull(0)?.toLongOrNull() ?: 0L
-                txTotal += parts.getOrNull(8)?.toLongOrNull() ?: 0L
-            }
-        }
-        return NetworkSpeed(rxTotal, txTotal, System.currentTimeMillis())
-    }
-
-    /** Returns (rxBytesPerSec, txBytesPerSec) from two consecutive snapshots. */
-    fun networkRate(prev: NetworkSpeed, curr: NetworkSpeed): Pair<Long, Long> {
-        val dtMs = curr.timestampMs - prev.timestampMs
-        if (dtMs <= 0L) return 0L to 0L
-        val rxRate = ((curr.rxBytesTotal - prev.rxBytesTotal) * 1000L / dtMs).coerceAtLeast(0L)
-        val txRate = ((curr.txBytesTotal - prev.txBytesTotal) * 1000L / dtMs).coerceAtLeast(0L)
-        return rxRate to txRate
-    }
-
-    /** Human-readable byte rate: "1.2 MB/s", "345 KB/s", "12 B/s". */
-    fun formatSpeedBps(bytesPerSec: Long): String = when {
-        bytesPerSec >= 1_000_000L -> "%.1f MB/s".format(bytesPerSec / 1_000_000f)
-        bytesPerSec >= 1_000L    -> "${bytesPerSec / 1_000} KB/s"
-        else                     -> "$bytesPerSec B/s"
-    }
-
-    // -- Disk I/O ----------------------------------------------------------------
-
-    data class DiskSnapshot(
-        val readSectors: Long,
-        val writeSectors: Long,
-        val timestampMs: Long,
-    )
-
-    /**
-     * Reads /proc/diskstats to get cumulative sector counts across top-level
-     * block devices. Skips loop, ram, zram, dm-*, sr devices and partition
-     * subdevices (e.g. mmcblk0p1, sda1). Returns null when the file can't
-     * be read (SELinux restriction or sandboxed environment).
-     *
-     * /proc/diskstats column layout (0-indexed):
-     *   2=device name, 5=sectors_read, 9=sectors_written. Each sector = 512 B.
-     */
-    fun diskSnapshot(): DiskSnapshot? = runCatching {
-        val lines = File("/proc/diskstats").readLines()
-        var readSectors = 0L
-        var writeSectors = 0L
-        for (line in lines) {
-            val parts = line.trim().split(Regex("\\s+"))
-            if (parts.size < 10) continue
-            val name = parts[2]
-            // Skip virtual / noise devices
-            if (name.matches(Regex("(loop|ram|zram|dm-|sr)\\d*.*"))) continue
-            // Skip partition subdevices
-            if (name.matches(Regex("mmcblk\\d+p\\d+.*"))) continue
-            if (name.matches(Regex("nvme\\d+n\\d+p\\d+.*"))) continue
-            if (name.matches(Regex("sd[a-z]\\d+.*"))) continue
-            if (name.matches(Regex("vd[a-z]\\d+.*"))) continue
-            readSectors += parts[5].toLongOrNull() ?: 0L
-            writeSectors += parts[9].toLongOrNull() ?: 0L
-        }
-        DiskSnapshot(readSectors, writeSectors, System.currentTimeMillis())
-    }.getOrNull()
-
-    /**
-     * Returns (readBps, writeBps) from two consecutive [DiskSnapshot]s.
-     * Returns (0, 0) if elapsed time is zero or negative.
-     */
-    fun diskRate(prev: DiskSnapshot, curr: DiskSnapshot): Pair<Long, Long> {
-        val elapsedMs = curr.timestampMs - prev.timestampMs
-        if (elapsedMs <= 0L) return 0L to 0L
-        val readBps = ((curr.readSectors - prev.readSectors).coerceAtLeast(0L) * 512L * 1000L) / elapsedMs
-        val writeBps = ((curr.writeSectors - prev.writeSectors).coerceAtLeast(0L) * 512L * 1000L) / elapsedMs
-        return readBps to writeBps
-    }
-
-    /** Formats a byte-per-second disk rate as a concise human-readable string. */
-    fun formatDiskBps(bytesPerSec: Long): String = when {
-        bytesPerSec >= 1_000_000L -> "%.1f MB/s".format(bytesPerSec / 1_000_000.0)
-        bytesPerSec >= 1_000L -> "${bytesPerSec / 1_000} KB/s"
-        else -> "$bytesPerSec B/s"
+        return zones.sortedByDescending { it.tempC }
     }
 
     // -- GPU ---------------------------------------------------------------------
 
-    /**
-     * Live GPU snapshot: frequency, utilisation, and DVFS governor.
-     *
-     * Probes multiple sysfs paths in priority order:
-     * 1. **Qualcomm Adreno** — `/sys/class/kgsl/kgsl-3d0/devfreq/` for frequencies,
-     *    `/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage` for utilisation.
-     * 2. **Generic devfreq** — scans `/sys/class/devfreq/` for an entry whose
-     *    directory name contains "gpu", "mali", "pvr", "rogue", "sgx", or "g3d".
-     *
-     * Returns an unavailable [Gpu] (`available = false`) on emulators or when
-     * SELinux policy blocks access to GPU sysfs nodes.
-     */
     data class Gpu(
-        /** Current frequency in MHz. 0 when unreadable. */
-        val curMhz: Long,
-        /** Minimum governor-allowed frequency in MHz. 0 when unreadable. */
-        val minMhz: Long,
-        /** Maximum governor-allowed frequency in MHz. 0 when unreadable. */
-        val maxMhz: Long,
-        /** Devfreq / kgsl governor name. null when unreadable. */
-        val governor: String?,
-        /**
-         * GPU utilisation 0–100. -1 when not exposed by this SoC's driver
-         * (most generic devfreq implementations lack a `load` or `busy_pct` file).
-         */
-        val usagePercent: Int,
-    ) {
-        /** Current frequency as a fraction of max (0f–1f). 0f when either value is 0. */
-        val freqFraction: Float
-            get() = if (maxMhz > 0 && curMhz > 0)
-                (curMhz.toFloat() / maxMhz.toFloat()).coerceIn(0f, 1f)
-            else 0f
+        val available: Boolean,
+        val currentFreqMhz: Int    = 0,
+        val minFreqMhz: Int        = 0,
+        val maxFreqMhz: Int        = 0,
+        val governor: String       = "",
+        val utilPercent: Int       = -1,    // -1 if not readable
+    )
 
-        /** true if at least one GPU frequency stat was readable from sysfs. */
-        val available: Boolean get() = maxMhz > 0
-    }
-
-    /**
-     * Read a single [Gpu] snapshot.
-     *
-     * Safe on any device — returns a zeroed sentinel rather than throwing when
-     * sysfs paths are absent or restricted by SELinux.
-     */
     fun gpu(): Gpu {
-        // 1. Qualcomm Adreno (kgsl) — most popular Android GPU family.
-        //    Frequencies live in devfreq/ subdirectory; utilisation via gpu_busy_percentage.
-        val kgslDevfreq = "/sys/class/kgsl/kgsl-3d0/devfreq"
-        if (File("$kgslDevfreq/cur_freq").exists()) {
-            val cur = readLong("$kgslDevfreq/cur_freq") / 1_000_000L
-            val min = readLong("$kgslDevfreq/min_freq") / 1_000_000L
-            val max = readLong("$kgslDevfreq/max_freq") / 1_000_000L
-            val gov = readString("$kgslDevfreq/governor")
-            val busyPct = readLong("/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage").toInt()
-            return Gpu(cur, min, max, gov, if (busyPct in 0..100) busyPct else -1)
+        val kgslBase   = "/sys/class/kgsl/kgsl-3d0"
+        val devfreqBase = "/sys/class/devfreq"
+        // Qualcomm KGSL path
+        val kgslCur = readLong("$kgslBase/gpuclk")
+        if (kgslCur > 0) {
+            val curMhz  = (kgslCur / 1_000_000).toInt()
+            val minMhz  = (readLong("$kgslBase/gpu_min_clock") / 1_000_000).toInt()
+            val maxMhz  = (readLong("$kgslBase/gpu_max_clock") / 1_000_000).toInt()
+            val governor = runCatching { File("$kgslBase/pwrscale/trustzone/governor").readText().trim() }
+                              .getOrElse { "" }
+            val util    = readLong("$kgslBase/gpu_busy_percentage").toInt()
+            return Gpu(true, curMhz, minMhz, maxMhz, governor, if (util < 0) -1 else util)
         }
-        // 2. Generic devfreq — Mali, PowerVR, IMG GPU (Google Tensor), etc.
-        //    /sys/class/devfreq/ entries are symlinks; listFiles() follows them automatically.
-        val gpuEntry = runCatching {
-            File("/sys/class/devfreq").listFiles()
-                ?.firstOrNull { f ->
-                    val name = f.name.lowercase()
-                    name.contains("gpu") || name.contains("mali") ||
-                        name.contains("pvr") || name.contains("rogue") ||
-                        name.contains("sgx") || name.contains("g3d")
-                }
-        }.getOrNull()
-        if (gpuEntry != null) {
-            val p = runCatching { gpuEntry.canonicalPath }.getOrElse { gpuEntry.absolutePath }
-            val cur = readLong("$p/cur_freq") / 1_000_000L
-            val min = readLong("$p/min_freq") / 1_000_000L
-            val max = readLong("$p/max_freq") / 1_000_000L
-            val gov = readString("$p/governor")
-            // Some devfreq drivers expose a `load` integer (0–100) for GPU utilisation
-            val usage = readString("$p/load")?.trim()?.toLongOrNull()?.toInt() ?: -1
-            return Gpu(cur, min, max, gov, if (usage in 0..100) usage else -1)
+        // ARM Mali / generic devfreq path
+        val devfreqDir = File(devfreqBase)
+        if (devfreqDir.exists()) {
+            for (child in devfreqDir.listFiles() ?: emptyArray()) {
+                val cur = readLong("${child.path}/cur_freq")
+                if (cur <= 0) continue
+                val min = readLong("${child.path}/min_freq")
+                val max = readLong("${child.path}/max_freq")
+                val gov = runCatching { File("${child.path}/governor").readText().trim() }.getOrElse { "" }
+                return Gpu(
+                    available = true,
+                    currentFreqMhz = (cur / 1_000_000).toInt(),
+                    minFreqMhz     = (min / 1_000_000).toInt(),
+                    maxFreqMhz     = (max / 1_000_000).toInt(),
+                    governor       = gov,
+                    utilPercent    = -1,
+                )
+            }
         }
-        return Gpu(0L, 0L, 0L, null, -1)
+        return Gpu(available = false)
     }
 
-    // -- System uptime -----------------------------------------------------------
+    // -- Storage volumes ---------------------------------------------------------
 
-    /**
-     * System uptime in seconds since the last boot.
-     *
-     * Reads the first floating-point field from `/proc/uptime` (total elapsed
-     * seconds since boot, including sleep time). No permissions required — the
-     * file is world-readable on standard Android. Returns 0L when inaccessible
-     * (sandboxed test environment, unusual SELinux policy).
-     */
-    fun systemUptimeSeconds(): Long =
+    data class Volume(
+        val path: String,
+        val label: String,
+        val totalBytes: Long,
+        val freeBytes: Long,
+    )
+
+    fun volumes(): List<Volume> {
+        val vols = mutableListOf<Volume>()
         runCatching {
-            File("/proc/uptime").readText().trim()
-                .split(Regex("\\s+")).firstOrNull()
-                ?.toDoubleOrNull()?.toLong() ?: 0L
-        }.getOrDefault(0L)
-
-    /**
-     * Formats an uptime in seconds as a concise human-readable string.
-     *
-     * Examples:
-     * - 47 minutes → "47m"
-     * - 2 hours 34 minutes → "2h 34m"
-     * - 5 days 3 hours → "5d 3h"
-     * - 0 / unavailable → "—"
-     */
-    fun formatUptime(seconds: Long): String {
-        if (seconds <= 0L) return "—"
-        val days = seconds / 86_400L
-        val hours = (seconds % 86_400L) / 3_600L
-        val mins = (seconds % 3_600L) / 60L
-        return when {
-            days > 0 && hours > 0 -> "${days}d ${hours}h"
-            days > 0              -> "${days}d"
-            hours > 0 && mins > 0 -> "${hours}h ${mins}m"
-            hours > 0             -> "${hours}h"
-            else                  -> "${mins}m"
+            val sf = StatFs(Environment.getDataDirectory().path)
+            vols += Volume(
+                path       = Environment.getDataDirectory().path,
+                label      = "Internal",
+                totalBytes = sf.blockCountLong * sf.blockSizeLong,
+                freeBytes  = sf.availableBlocksLong * sf.blockSizeLong,
+            )
         }
+        return vols
     }
 
-    // -- Wi-Fi signal strength --------------------------------------------------
+    // -- Disk I\/O ---------------------------------------------------------------
+
+    data class DiskSnapshot(val readBytes: Long, val writeBytes: Long, val ts: Long)
+
+    fun diskSnapshot(): DiskSnapshot? = try {
+        var totalRead = 0L; var totalWrite = 0L
+        File("/proc/diskstats").forEachLine { line ->
+            val parts = line.trim().split("\\s+".toRegex())
+            if (parts.size >= 10) {
+                totalRead  += parts[5].toLong()  * 512
+                totalWrite += parts[9].toLong()  * 512
+            }
+        }
+        DiskSnapshot(totalRead, totalWrite, System.currentTimeMillis())
+    } catch (_: Exception) { null }
+
+    fun diskRate(prev: DiskSnapshot, curr: DiskSnapshot): Pair<Long, Long> {
+        val dt = (curr.ts - prev.ts).coerceAtLeast(1)
+        val readBps  = ((curr.readBytes  - prev.readBytes)  * 1000 / dt).coerceAtLeast(0)
+        val writeBps = ((curr.writeBytes - prev.writeBytes) * 1000 / dt).coerceAtLeast(0)
+        return readBps to writeBps
+    }
+
+    // -- Network throughput ------------------------------------------------------
+
+    data class NetworkSpeed(val rxBytes: Long, val txBytes: Long, val ts: Long)
+
+    fun networkSnapshot(): NetworkSpeed {
+        val rx = try { File("/proc/net/dev").readLines()
+            .drop(2)
+            .sumOf { it.trim().split("\\s+".toRegex()).getOrElse(1) { "0" }.toLong() }
+        } catch (_: Exception) { 0L }
+        val tx = try { File("/proc/net/dev").readLines()
+            .drop(2)
+            .sumOf { it.trim().split("\\s+".toRegex()).getOrElse(9) { "0" }.toLong() }
+        } catch (_: Exception) { 0L }
+        return NetworkSpeed(rx, tx, System.currentTimeMillis())
+    }
+
+    fun networkRate(prev: NetworkSpeed, curr: NetworkSpeed): Pair<Long, Long> {
+        val dt = (curr.ts - prev.ts).coerceAtLeast(1)
+        return ((curr.rxBytes - prev.rxBytes) * 1000 / dt) to
+               ((curr.txBytes - prev.txBytes) * 1000 / dt)
+    }
+
+    // -- Network traffic totals (cumulative since boot) --------------------------
 
     /**
-     * Live Wi-Fi signal strength in dBm, or null when not connected.
-     *
-     * Reads [WifiManager.connectionInfo.rssi] via ACCESS_WIFI_STATE (already held
-     * by Marrow). Returns null when not connected, WifiManager unavailable, or
-     * RSSI is outside the valid range. [WifiManager.getConnectionInfo] is
-     * deprecated on API 31+ but still functional for RSSI reads without
-     * ACCESS_FINE_LOCATION. Suppressing is intentional.
+     * Cumulative bytes received across all interfaces since the last device reboot.
+     * Reads [android.net.TrafficStats.getTotalRxBytes] — returns null when the
+     * system returns [android.net.TrafficStats.UNSUPPORTED].
+     * No permissions required.
      */
+    fun totalRxBytes(): Long? {
+        val v = android.net.TrafficStats.getTotalRxBytes()
+        return if (v == android.net.TrafficStats.UNSUPPORTED.toLong()) null else v
+    }
+
+    /**
+     * Cumulative bytes transmitted across all interfaces since the last device reboot.
+     * Reads [android.net.TrafficStats.getTotalTxBytes] — returns null when the
+     * system returns [android.net.TrafficStats.UNSUPPORTED].
+     * No permissions required.
+     */
+    fun totalTxBytes(): Long? {
+        val v = android.net.TrafficStats.getTotalTxBytes()
+        return if (v == android.net.TrafficStats.UNSUPPORTED.toLong()) null else v
+    }
+
+    // -- Uptime ------------------------------------------------------------------
+
+    fun systemUptimeSeconds(): Long = try {
+        File("/proc/uptime").readText().trim().split(" ").first().toFloat().toLong()
+    } catch (_: Exception) { 0L }
+
+    // -- Wi-Fi -------------------------------------------------------------------
+
     @Suppress("DEPRECATION")
     fun wifiRssi(context: Context): Int? {
-        val wm = context.applicationContext
-            .getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return null
-        val rssi = wm.connectionInfo?.rssi ?: return null
-        // Valid RSSI: negative and >= -120 dBm; 0 = disconnected sentinel.
-        return if (rssi < 0 && rssi >= -120) rssi else null
+        val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE)
+            as? WifiManager ?: return null
+        val info = wm.connectionInfo ?: return null
+        val rssi = info.rssi
+        return if (rssi == Int.MIN_VALUE || rssi == 0) null else rssi
     }
 
-
-    /**
-     * Current Wi-Fi link speed in Mbps, or null when not connected to Wi-Fi.
-     *
-     * Uses the same deprecated-but-functional [WifiManager.getConnectionInfo] path as
-     * [wifiRssi]. [WifiManager.LINK_SPEED_UNKNOWN] (-1) is returned when the device is
-     * not associated; any non-positive value is treated as unavailable.
-     */
     @Suppress("DEPRECATION")
     fun wifiLinkSpeedMbps(context: Context): Int? {
-        val wm = context.applicationContext
-            .getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return null
-        val speed = wm.connectionInfo?.linkSpeed ?: return null
-        return if (speed > 0) speed else null
+        val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE)
+            as? WifiManager ?: return null
+        val info = wm.connectionInfo ?: return null
+        val speed = info.linkSpeed
+        return if (speed <= 0) null else speed
     }
 
-
     /**
-     * Live Wi-Fi frequency in MHz from [android.net.wifi.WifiInfo.getFrequency].
-     * Returns null when not connected to a Wi-Fi network or frequency is unavailable.
+     * Current Wi-Fi operating frequency in MHz.
      *
-     * Typical values:
-     * - 2.4 GHz band: 2412–2484 MHz
-     * - 5 GHz band:   5180–5825 MHz
-     * - 6 GHz band:   5945–7125 MHz (Wi-Fi 6E / 7)
+     * Returns null when the device is not connected to Wi-Fi, or when the frequency
+     * is unavailable. Band classification:
+     * - 2.4 GHz: 2412–2484 MHz
+     * - 5 GHz: 5180–5825 MHz
+     * - 6 GHz (Wi-Fi 6E\/7): 5945–7125 MHz
      *
-     * No permissions required (uses same deprecated [WifiInfo] as [wifiRssi]).
+     * No special permissions required (uses the deprecated [android.net.wifi.WifiInfo.getFrequency]
+     * which is available without [android.Manifest.permission.ACCESS_FINE_LOCATION] from API 31+
+     * when network-scoped access is used). Same [Suppress(DEPRECATION)] pattern as rssi\/linkspeed.
      */
     @Suppress("DEPRECATION")
     fun wifiFrequencyMhz(context: Context): Int? {
-        val wm = context.applicationContext
-            .getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return null
-        val freq = wm.connectionInfo?.frequency ?: return null
-        return if (freq > 0) freq else null
+        val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE)
+            as? WifiManager ?: return null
+        val info = wm.connectionInfo ?: return null
+        val freq = info.frequency
+        return if (freq <= 0) null else freq
     }
 
     /**
-     * The 802.11 Wi-Fi standard of the current connection as a user-facing label,
-     * or null when not connected to Wi-Fi, the standard is unknown/legacy, or the
-     * device reports [android.net.wifi.ScanResult.WIFI_STANDARD_UNKNOWN].
+     * 802.11 Wi-Fi standard label for the current connection.
      *
-     * Uses [android.net.wifi.WifiInfo.getWifiStandard] (API 30+, matching minSdk).
-     * Returns one of: "Wi-Fi 4" (802.11n), "Wi-Fi 5" (802.11ac), "Wi-Fi 6" (802.11ax /
-     * Wi-Fi 6E), "Wi-Fi 7" (802.11be). Legacy 802.11a/b/g returns null — too old to be
-     * worth displaying on a modern device. Uses same deprecated [WifiInfo] as [wifiRssi].
+     * Maps [android.net.wifi.WifiInfo.getWifiStandard] → [android.net.wifi.ScanResult.WIFI_STANDARD_*]
+     * constants to human-readable strings:
+     * - [android.net.wifi.ScanResult.WIFI_STANDARD_LEGACY] (1) → “Wi-Fi 1”
+     * - [android.net.wifi.ScanResult.WIFI_STANDARD_11N] (4) → “Wi-Fi 4” (802.11n)
+     * - [android.net.wifi.ScanResult.WIFI_STANDARD_11AC] (5) → “Wi-Fi 5” (802.11ac)
+     * - [android.net.wifi.ScanResult.WIFI_STANDARD_11AX] (6) → “Wi-Fi 6” (802.11ax)
+     * - [android.net.wifi.ScanResult.WIFI_STANDARD_11BE] (8) → “Wi-Fi 7” (802.11be)
+     * - Other / unknown → null
      *
-     * Note: the WIFI_STANDARD_* constants are defined in [android.net.wifi.ScanResult],
-     * not [android.net.wifi.WifiInfo], despite being returned by [WifiInfo.getWifiStandard].
+     * No special permissions required (same as rssi\/linkspeed\/frequency).
      */
     @Suppress("DEPRECATION")
     fun wifiStandard(context: Context): String? {
-        val wm = context.applicationContext
-            .getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return null
+        val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE)
+            as? WifiManager ?: return null
         val info = wm.connectionInfo ?: return null
         return when (info.wifiStandard) {
-            android.net.wifi.ScanResult.WIFI_STANDARD_11N  -> "Wi-Fi 4"  // 802.11n
-            android.net.wifi.ScanResult.WIFI_STANDARD_11AC -> "Wi-Fi 5"  // 802.11ac
-            android.net.wifi.ScanResult.WIFI_STANDARD_11AX -> "Wi-Fi 6"  // 802.11ax / Wi-Fi 6E
-            android.net.wifi.ScanResult.WIFI_STANDARD_11BE -> "Wi-Fi 7"  // 802.11be
-            else -> null  // UNKNOWN(0), LEGACY(1), or future undeclared standards
+            android.net.wifi.ScanResult.WIFI_STANDARD_LEGACY -> "Wi-Fi 1"
+            android.net.wifi.ScanResult.WIFI_STANDARD_11N    -> "Wi-Fi 4"
+            android.net.wifi.ScanResult.WIFI_STANDARD_11AC   -> "Wi-Fi 5"
+            android.net.wifi.ScanResult.WIFI_STANDARD_11AX   -> "Wi-Fi 6"
+            android.net.wifi.ScanResult.WIFI_STANDARD_11BE   -> "Wi-Fi 7"
+            else -> null
         }
     }
 
     /**
-     * Returns the device's primary IPv4 address (e.g. "192.168.1.42"), or null if the
-     * device has no active non-loopback IPv4 interface.
+     * Device’s primary local IPv4 address.
      *
-     * Uses [NetworkInterface.getNetworkInterfaces] which works on all API levels and
-     * does not require any permissions.
+     * Iterates all [NetworkInterface]s and returns the first non-loopback
+     * [Inet4Address] it finds. Returns null when no active IPv4 interface is
+     * found (e.g. airplane mode, or an IPv6-only connection).
+     *
+     * No permissions required — [NetworkInterface.getNetworkInterfaces] is available
+     * to all apps on all API levels.
      */
-    fun localIpV4(): String? = try {
-        NetworkInterface.getNetworkInterfaces()
-            ?.asSequence()
-            ?.flatMap { it.inetAddresses.asSequence() }
-            ?.firstOrNull { !it.isLoopbackAddress && it is Inet4Address }
-            ?.hostAddress
-    } catch (_: Exception) { null }
+    fun localIpV4(): String? = runCatching {
+        NetworkInterface.getNetworkInterfaces()?.asSequence()
+            ?.flatMap { iface -> iface.inetAddresses.asSequence() }
+            ?.firstOrNull { addr ->
+                addr is Inet4Address && !addr.isLoopbackAddress
+            }?.hostAddress
+    }.getOrNull()
 
-    // -- Charge time remaining --------------------------------------------------
+    // -- VPN state ---------------------------------------------------------------
 
     /**
-     * Estimated time remaining until the battery is fully charged, in milliseconds.
+     * Whether a VPN tunnel is currently active.
      *
-     * Uses [BatteryManager.computeChargeTimeRemaining] (API 21+, always available
-     * since Marrow's minSdk is 30). Returns -1L when the device is not charging,
-     * the estimate is unavailable, or BatteryManager cannot be obtained.
+     * Checks [android.net.NetworkCapabilities.TRANSPORT_VPN] on the active network.
+     * Returns false when no active network is present, null when [android.net.ConnectivityManager]
+     * is unavailable. No extra permissions required.
      */
-    fun chargeTimeRemainingMs(context: Context): Long {
-        val mgr = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager ?: return -1L
-        return mgr.computeChargeTimeRemaining()
-    }
-
-    /**
-     * Formats a charge time remaining in milliseconds as a concise human-readable string.
-     *
-     * Examples: 3_960_000ms (66 min) → "1h 6m", 2_700_000ms (45 min) → "45m", ≤ 0 → "—"
-     */
-    fun formatChargeEta(ms: Long): String {
-        if (ms <= 0L) return "—"
-        val totalSeconds = ms / 1000L
-        val hours = totalSeconds / 3_600L
-        val mins = (totalSeconds % 3_600L) / 60L
-        return when {
-            hours > 0L && mins > 0L -> "${hours}h ${mins}m"
-            hours > 0L              -> "${hours}h"
-            mins > 0L               -> "${mins}m"
-            else                    -> "<1m"
-        }
-    }
-
+    fun isVpnActive(context: Context): Boolean? = runCatching {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE)
+            as? android.net.ConnectivityManager ?: return@runCatching null
+        val network = cm.activeNetwork ?: return@runCatching false
+        val caps = cm.getNetworkCapabilities(network) ?: return@runCatching false
+        caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)
+    }.getOrNull()
 
     // -- Screen brightness -------------------------------------------------------
 
     /**
      * Current screen brightness as a percentage (0–100).
      *
-     * Reads [Settings.System.SCREEN_BRIGHTNESS] (raw 0–255 integer). Responds to
-     * adaptive brightness changes in real time — [SCREEN_BRIGHTNESS] tracks the actual
-     * hardware backlight level even when automatic mode is active.
-     *
-     * No special permissions required; [Settings.System] is always readable by
-     * standard apps. Returns null when the key is absent (should not occur on
-     * standard Android).
+     * Reads [Settings.System.SCREEN_BRIGHTNESS] (raw 0–255) and scales to 0–100.
+     * Returns null if the setting cannot be read (should not occur on standard Android).
+     * No special permissions required.
      */
     fun screenBrightnessPercent(context: Context): Int? = try {
         val raw = Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS)
@@ -770,28 +525,59 @@ object LiveStats {
         null
     }
 
+    // -- Dark mode & auto-rotate ------------------------------------------------
+
+    /**
+     * Whether the system is currently in dark (night) mode.
+     *
+     * Reads [android.content.res.Configuration.uiMode] which reflects the actual
+     * active night mode — including battery-saver dark mode and scheduled dark mode.
+     * Returns true when dark, false when light. No special permissions required.
+     */
+    fun isDarkMode(context: Context): Boolean =
+        (context.resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+    /**
+     * Whether auto-rotate (accelerometer-based rotation) is currently enabled.
+     *
+     * Reads [Settings.System.ACCELEROMETER_ROTATION]. Returns true when auto-rotate
+     * is active, false when the device is locked to portrait. null when the setting
+     * is unavailable (rare on standard Android). No special permissions required.
+     */
+    fun isAutoRotateEnabled(context: Context): Boolean? = runCatching {
+        Settings.System.getInt(
+            context.contentResolver,
+            Settings.System.ACCELEROMETER_ROTATION,
+        ) == 1
+    }.getOrNull()
+
     // -- Display refresh rate ---------------------------------------------------
 
     /**
      * Current screen refresh rate in Hz.
      *
      * Reads [android.view.Display.getRefreshRate] via [Context.getDisplay] (API 30+,
-     * matching Marrow's minSdk). On fixed-rate displays this always returns the panel's
+     * matching Marrow’s minSdk). On fixed-rate displays this always returns the panel’s
      * configured rate. On LTPO / VRR panels (e.g. Pixel 8 Pro, Samsung Galaxy S24 Ultra)
-     * the value adapts dynamically — 120 Hz when scrolling, as low as 1 Hz when the
-     * screen is static. No permissions required.
+     * the value adapts dynamically — 120 Hz when scrolling, as low as 1 Hz when the screen
+     * is static.
      *
-     * Returns null when [Context.getDisplay] is unavailable (service environment,
-     * non-UI context, or unusual device configuration).
+     * Returns null in non-UI contexts or when [Context.getDisplay] returns null (e.g. when
+     * called from a service without a display). No permissions required.
      */
     fun screenRefreshRateHz(context: Context): Float? = runCatching {
-        context.display?.refreshRate?.takeIf { it > 0f }
+        context.display?.refreshRate
     }.getOrNull()
 
+    // -- Battery saver -----------------------------------------------------------
 
     /**
-     * Returns whether battery saver (low-power) mode is currently active,
-     * null when [PowerManager] is unavailable. No special permissions required.
+     * Whether battery saver (low-power) mode is currently active.
+     *
+     * Reads [android.os.PowerManager.isPowerSaveMode]. Returns null when
+     * [PowerManager] is unavailable. No permissions required.
      */
     fun batterySaverActive(context: Context): Boolean? = runCatching {
         val pm = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
@@ -804,204 +590,49 @@ object LiveStats {
     /**
      * Whether airplane mode is currently enabled.
      *
-     * Reads [Settings.Global.AIRPLANE_MODE_ON]. Zero permissions required.
+     * Reads [Settings.Global.AIRPLANE_MODE_ON]. Returns null when the setting
+     * cannot be read. No special permissions required.
      */
-    fun isAirplaneModeOn(context: Context): Boolean =
-        Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) != 0
+    fun isAirplaneModeOn(context: Context): Boolean? = runCatching {
+        Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON) == 1
+    }.getOrNull()
 
     /**
-     * Whether NFC is currently enabled, or null if the device has no NFC hardware.
+     * Whether NFC is enabled on this device.
      *
-     * Uses [android.nfc.NfcAdapter.getDefaultAdapter]; returns null when the adapter
-     * is not present (hardware absent). Zero additional permissions required.
+     * Returns null when the device has no NFC hardware. Returns false when NFC hardware
+     * is present but currently disabled. No special permissions required.
      */
-    fun isNfcEnabled(context: Context): Boolean? =
-        runCatching {
-            android.nfc.NfcAdapter.getDefaultAdapter(context)?.isEnabled
-        }.getOrNull()
+    fun isNfcEnabled(context: Context): Boolean? = runCatching {
+        val nfcAdapter = android.nfc.NfcAdapter.getDefaultAdapter(context) ?: return@runCatching null
+        nfcAdapter.isEnabled
+    }.getOrNull()
 
     /**
-     * Whether Bluetooth is currently enabled on this device.
+     * Whether Bluetooth is currently enabled.
      *
-     * Reads Settings.Global key "bluetooth_on" which is world-readable —
-     * zero additional permissions required on all API levels (including API 31+
-     * where BLUETOOTH_CONNECT would otherwise be needed for BluetoothAdapter).
+     * Reads [Settings.Global] “bluetooth_on” — a world-readable system setting available
+     * on all API levels without any Bluetooth permission (no BLUETOOTH_CONNECT needed).
      *
-     * Returns null only on unexpected exceptions (should never happen in practice).
+     * Returns true when BT is on, false when off, null when the setting is absent
+     * (should not occur on standard Android). Zero permissions required.
      */
     fun isBluetoothEnabled(context: Context): Boolean? = runCatching {
-        Settings.Global.getInt(context.contentResolver, "bluetooth_on", -1)
-            .takeIf { it >= 0 }
-            ?.let { it != 0 }
+        Settings.Global.getInt(context.contentResolver, "bluetooth_on") == 1
     }.getOrNull()
-
-    /**
-     * Whether a VPN tunnel is currently active on this device.
-     *
-     * Checks [android.net.NetworkCapabilities.TRANSPORT_VPN] on the active network
-     * via [android.net.ConnectivityManager]. ACCESS_NETWORK_STATE is already declared
-     * in the manifest — no additional permissions required.
-     *
-     * Returns false when there is no active network (airplane mode, etc.);
-     * null when ConnectivityManager is unavailable (should not occur in practice).
-     */
-    fun isVpnActive(context: Context): Boolean? = runCatching {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE)
-            as? android.net.ConnectivityManager ?: return@runCatching null
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return@runCatching false
-        caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)
-    }.getOrNull()
-
-    // -- Network traffic totals -------------------------------------------------
-
-    /**
-     * Total bytes received across all network interfaces since the last device boot.
-     *
-     * Reads [android.net.TrafficStats.getTotalRxBytes]. No permissions required.
-     * Returns null when the counter is unavailable
-     * ([android.net.TrafficStats.UNSUPPORTED] = -1L).
-     */
-    fun totalRxBytes(): Long? {
-        val v = android.net.TrafficStats.getTotalRxBytes()
-        return if (v == android.net.TrafficStats.UNSUPPORTED.toLong()) null else v
-    }
-
-    /**
-     * Total bytes transmitted across all network interfaces since the last device boot.
-     *
-     * Reads [android.net.TrafficStats.getTotalTxBytes]. No permissions required.
-     * Returns null when the counter is unavailable
-     * ([android.net.TrafficStats.UNSUPPORTED] = -1L).
-     */
-    fun totalTxBytes(): Long? {
-        val v = android.net.TrafficStats.getTotalTxBytes()
-        return if (v == android.net.TrafficStats.UNSUPPORTED.toLong()) null else v
-    }
-
-    /**
-     * Formats a byte count as a concise human-readable string using SI prefixes.
-     *
-     * Examples: 999 → "999 B", 1234 → "1.2 KB", 1_234_567 → "1.2 MB",
-     * 1_234_567_890 → "1.2 GB".
-     */
-    fun formatBytes(bytes: Long): String = when {
-        bytes >= 1_000_000_000L -> "%.1f GB".format(bytes / 1_000_000_000f)
-        bytes >= 1_000_000L     -> "%.1f MB".format(bytes / 1_000_000f)
-        bytes >= 1_000L         -> "%.1f KB".format(bytes / 1_000f)
-        else                    -> "$bytes B"
-    }
-
-    // -- Cellular ----------------------------------------------------------------
-
-    /**
-     * Live cellular/telephony snapshot. Fields that require [android.Manifest.permission.READ_BASIC_PHONE_STATE]
-     * (normal permission, API 33+) or [android.Manifest.permission.READ_PHONE_STATE] (dangerous) are
-     * wrapped in [runCatching] and fall back to `null` when the permission is absent or the device
-     * does not support telephony.
-     *
-     * @param operatorName    Registered network operator display name (e.g. "Vodafone IE"). Null when
-     *                        the radio is unregistered, in airplane mode, or the SIM is absent.
-     * @param simOperatorName SIM service provider name from the carrier file on the SIM card.
-     *                        May differ from [operatorName] when roaming.
-     * @param simState        Human-readable SIM state: "Ready", "Absent", "PIN Required",
-     *                        "PUK Required", "Network Locked", "I/O Error", "Restricted", or "Unknown".
-     * @param networkTypeName Generation label of the active data network: "5G", "LTE", "3G", "2G",
-     *                        "Wi-Fi Call", or null when the type is unknown or unavailable.
-     * @param signalLevel     Signal strength bar count: 0 (none) – 4 (excellent). Derived from
-     *                        [android.telephony.SignalStrength.getLevel]. Null when unavailable.
-     * @param isRoaming       True when the device is using a network other than its home network.
-     */
-    data class Cellular(
-        val operatorName: String?,
-        val simOperatorName: String?,
-        val simState: String,
-        val networkTypeName: String?,
-        val signalLevel: Int?,
-        val isRoaming: Boolean,
-    )
-
-    /**
-     * Returns a [Cellular] snapshot from [android.telephony.TelephonyManager].
-     *
-     * Zero-permission fields are always populated. Fields requiring
-     * [android.Manifest.permission.READ_BASIC_PHONE_STATE] (API 33+ normal permission)
-     * fall back to null gracefully on API < 33 or when the permission is missing.
-     * Always safe — every access is wrapped in [runCatching].
-     *
-     * Returns null when the device has no telephony hardware
-     * ([android.content.pm.PackageManager.FEATURE_TELEPHONY] absent).
-     */
-    fun cellularInfo(context: Context): Cellular? = runCatching {
-        val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
-            ?: return@runCatching null
-        if (!context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEPHONY)) {
-            return@runCatching null
-        }
-
-        // Zero-permission fields
-        val operatorName = tm.networkOperatorName.takeIf { it.isNotBlank() }
-        val simOperatorName = tm.simOperatorName.takeIf { it.isNotBlank() }
-        val simState = when (tm.simState) {
-            android.telephony.TelephonyManager.SIM_STATE_READY           -> "Ready"
-            android.telephony.TelephonyManager.SIM_STATE_ABSENT          -> "Absent"
-            android.telephony.TelephonyManager.SIM_STATE_PIN_REQUIRED    -> "PIN Required"
-            android.telephony.TelephonyManager.SIM_STATE_PUK_REQUIRED    -> "PUK Required"
-            android.telephony.TelephonyManager.SIM_STATE_NETWORK_LOCKED  -> "Network Locked"
-            android.telephony.TelephonyManager.SIM_STATE_CARD_IO_ERROR   -> "I/O Error"
-            android.telephony.TelephonyManager.SIM_STATE_CARD_RESTRICTED -> "Restricted"
-            else                                                          -> "Unknown"
-        }
-        val isRoaming = tm.isNetworkRoaming
-
-        // READ_BASIC_PHONE_STATE (normal, API 33+) — network type + signal level
-        // runCatching handles SecurityException on API < 33 without READ_PHONE_STATE
-        val networkTypeName = runCatching {
-            cellularNetworkTypeName(tm.dataNetworkType)
-        }.getOrNull()
-        val signalLevel = runCatching {
-            tm.signalStrength?.level?.takeIf { it in 0..4 }
-        }.getOrNull()
-
-        Cellular(operatorName, simOperatorName, simState, networkTypeName, signalLevel, isRoaming)
-    }.getOrNull()
-
-    /** Maps a [android.telephony.TelephonyManager.getDataNetworkType] constant to a
-     *  generation label. Returns null for unknown / unavailable. */
-    private fun cellularNetworkTypeName(type: Int): String? = when (type) {
-        android.telephony.TelephonyManager.NETWORK_TYPE_GPRS,
-        android.telephony.TelephonyManager.NETWORK_TYPE_EDGE,
-        android.telephony.TelephonyManager.NETWORK_TYPE_CDMA,
-        android.telephony.TelephonyManager.NETWORK_TYPE_1xRTT,
-        android.telephony.TelephonyManager.NETWORK_TYPE_IDEN    -> "2G"
-        android.telephony.TelephonyManager.NETWORK_TYPE_UMTS,
-        android.telephony.TelephonyManager.NETWORK_TYPE_HSDPA,
-        android.telephony.TelephonyManager.NETWORK_TYPE_HSUPA,
-        android.telephony.TelephonyManager.NETWORK_TYPE_HSPA,
-        android.telephony.TelephonyManager.NETWORK_TYPE_EVDO_0,
-        android.telephony.TelephonyManager.NETWORK_TYPE_EVDO_A,
-        android.telephony.TelephonyManager.NETWORK_TYPE_EVDO_B,
-        android.telephony.TelephonyManager.NETWORK_TYPE_EHRPD,
-        android.telephony.TelephonyManager.NETWORK_TYPE_HSPAP   -> "3G"
-        android.telephony.TelephonyManager.NETWORK_TYPE_LTE     -> "LTE"
-        android.telephony.TelephonyManager.NETWORK_TYPE_IWLAN   -> "Wi-Fi Call"
-        android.telephony.TelephonyManager.NETWORK_TYPE_NR      -> "5G"
-        else                                                     -> null
-    }
 
     // -- Audio -------------------------------------------------------------------
 
-    /** Current ringer mode from [android.media.AudioManager.getRingerMode]. */
     enum class RingerMode { NORMAL, VIBRATE, SILENT }
 
     /**
-     * Current ringer mode, or null when [AudioManager] is unavailable.
-     *
-     * Maps [android.media.AudioManager.RINGER_MODE_NORMAL] / [RINGER_MODE_VIBRATE] /
-     * [RINGER_MODE_SILENT] to [RingerMode]. No permissions required.
+     * Current ringer mode from [android.media.AudioManager].
+     * Maps to [RingerMode.NORMAL], [RingerMode.VIBRATE], or [RingerMode.SILENT].
+     * Returns null when [AudioManager] is unavailable. No permissions required.
      */
     fun ringerMode(context: Context): RingerMode? = runCatching {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-            ?: return@runCatching null
+                    ?: return@runCatching null
         when (am.ringerMode) {
             android.media.AudioManager.RINGER_MODE_NORMAL  -> RingerMode.NORMAL
             android.media.AudioManager.RINGER_MODE_VIBRATE -> RingerMode.VIBRATE
@@ -1013,44 +644,41 @@ object LiveStats {
     /**
      * Current media (music) stream volume as a percentage (0–100).
      *
-     * Reads [android.media.AudioManager.getStreamVolume] /
-     * [android.media.AudioManager.getStreamMaxVolume] for [STREAM_MUSIC].
-     * Returns null when [AudioManager] is unavailable or max volume is 0.
-     * No permissions required.
+     * Reads [android.media.AudioManager.STREAM_MUSIC] volume scaled to
+     * [android.media.AudioManager.getStreamMaxVolume]. Returns null when
+     * [AudioManager] is unavailable or when max volume is 0. No permissions required.
      */
     fun mediaVolumePct(context: Context): Int? = runCatching {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-            ?: return@runCatching null
-        val max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
-        if (max <= 0) return@runCatching null
+                    ?: return@runCatching null
         val cur = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
-        (cur * 100 / max).coerceIn(0, 100)
+        val max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+        if (max <= 0) null else (cur * 100 / max).coerceIn(0, 100)
     }.getOrNull()
 
     /**
-     * Whether music is currently active (playing or paused-recently) via
-     * [android.media.AudioManager.isMusicActive]. No permissions required.
-     * Returns null when [AudioManager] is unavailable.
+     * Whether music is currently active.
+     *
+     * Reads [android.media.AudioManager.isMusicActive]. Returns null when
+     * [AudioManager] is unavailable. No permissions required.
      */
     fun isMusicActive(context: Context): Boolean? = runCatching {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-            ?: return@runCatching null
+                    ?: return@runCatching null
         am.isMusicActive
     }.getOrNull()
 
     /**
-     * Current Do Not Disturb (DND) interruption filter as a user-facing label.
+     * Current Do Not Disturb interruption filter as a human-readable label.
      *
-     * Reads [android.app.NotificationManager.getCurrentInterruptionFilter]. Zero permissions
-     * required — the interruption filter is readable by any app without special permissions.
+     * Reads [android.app.NotificationManager.getCurrentInterruptionFilter]:
+     * - [android.app.NotificationManager.INTERRUPTION_FILTER_ALL] → “Off” (DND is off, all notifications pass)
+     * - [android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY] → “Priority”
+     * - [android.app.NotificationManager.INTERRUPTION_FILTER_ALARMS] → “Alarms”
+     * - [android.app.NotificationManager.INTERRUPTION_FILTER_NONE] → “Total Silence”
      *
-     * Returns one of: "Off" (all notifications pass through),
-     * "Priority" (priority-only mode — calls/alarms from priority contacts),
-     * "Alarms" (alarms only), "Total Silence" (all sounds blocked).
-     * Returns null when [NotificationManager] is unavailable or the filter is
-     * [android.app.NotificationManager.INTERRUPTION_FILTER_UNKNOWN] (0).
-     *
-     * Phone only. Zero permissions required.
+     * Returns null when [NotificationManager] is unavailable or when the
+     * interruption filter value is unrecognised. No permissions required.
      */
     fun dndMode(context: Context): String? = runCatching {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE)
@@ -1060,15 +688,62 @@ object LiveStats {
             android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY -> "Priority"
             android.app.NotificationManager.INTERRUPTION_FILTER_ALARMS   -> "Alarms"
             android.app.NotificationManager.INTERRUPTION_FILTER_NONE     -> "Total Silence"
-            else                                                          -> null
+            else -> null
         }
     }.getOrNull()
 
-    // -- helpers -----------------------------------------------------------------
+    // -- Telephony / Cellular ----------------------------------------------------
 
-    private fun readLong(path: String): Long =
-        runCatching { File(path).readText().trim().toLong() }.getOrDefault(0L)
+    data class Cellular(
+        val carrierName: String?,
+        val networkType: String?,       // "5G", "LTE", "3G", "2G", "Wi-Fi Call", etc.
+        val signalLevel: Int?,          // 0–4 bars; null when unavailable
+        val roaming: Boolean,
+    )
 
-    private fun readString(path: String): String? =
-        runCatching { File(path).readText().trim() }.getOrNull()
+    /**
+     * Snapshot of the current cellular state.
+     *
+     * Reads carrier name, network type, signal level (bars), and roaming status
+     * via [android.telephony.TelephonyManager].
+     *
+     * Requires [android.Manifest.permission.READ_BASIC_PHONE_STATE] (normal permission,
+     * API 33+; degrades to null on API < 33 unless the legacy
+     * [android.Manifest.permission.READ_PHONE_STATE] is held).
+     *
+     * Returns null on devices without telephony hardware (Wi-Fi-only tablets, emulators
+     * without telephony support).
+     */
+    fun cellularInfo(context: Context): Cellular? = runCatching {
+        val tm = context.getSystemService(Context.TELEPHONY_SERVICE)
+            as? android.telephony.TelephonyManager ?: return@runCatching null
+        val carrier = tm.networkOperatorName?.takeIf { it.isNotBlank() }
+        val netType = when (tm.dataNetworkType) {
+            android.telephony.TelephonyManager.NETWORK_TYPE_NR        -> "5G"
+            android.telephony.TelephonyManager.NETWORK_TYPE_LTE       -> "LTE"
+            android.telephony.TelephonyManager.NETWORK_TYPE_HSPAP,
+            android.telephony.TelephonyManager.NETWORK_TYPE_HSPA,
+            android.telephony.TelephonyManager.NETWORK_TYPE_HSDPA,
+            android.telephony.TelephonyManager.NETWORK_TYPE_HSUPA,
+            android.telephony.TelephonyManager.NETWORK_TYPE_UMTS      -> "3G"
+            android.telephony.TelephonyManager.NETWORK_TYPE_EDGE,
+            android.telephony.TelephonyManager.NETWORK_TYPE_GPRS,
+            android.telephony.TelephonyManager.NETWORK_TYPE_CDMA,
+            android.telephony.TelephonyManager.NETWORK_TYPE_1xRTT,
+            android.telephony.TelephonyManager.NETWORK_TYPE_IDEN      -> "2G"
+            android.telephony.TelephonyManager.NETWORK_TYPE_IWLAN     -> "Wi-Fi Call"
+            else -> null
+        }
+        val signalLevel = runCatching {
+            tm.signalStrength?.level
+        }.getOrNull()
+        val roaming = tm.isNetworkRoaming
+        Cellular(carrier, netType, signalLevel, roaming)
+    }.getOrNull()
+
+    // -- Helpers -----------------------------------------------------------------
+
+    private fun readLong(path: String): Long = try {
+        File(path).readText().trim().toLong()
+    } catch (_: Exception) { -1L }
 }
