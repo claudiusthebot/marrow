@@ -1619,6 +1619,7 @@ private fun LocationPermissionCard(onGrant: () -> Unit) {
 @Composable
 fun CellularHero(vm: MarrowViewModel, section: Section) {
     val cellular by vm.cellular.collectAsState()
+    val callState by vm.callState.collectAsState()
 
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
@@ -1692,6 +1693,16 @@ fun CellularHero(vm: MarrowViewModel, section: Section) {
                 if (simOp != null && simOp != cell.operatorName) {
                     Spacer(Modifier.height(4.dp))
                     BigStat("SIM Provider", simOp)
+                }
+
+                if (callState != null) {
+                    val callColor = when (callState) {
+                        "In Call"  -> MaterialTheme.colorScheme.primary
+                        "Ringing"  -> MaterialTheme.colorScheme.tertiary
+                        else       -> MaterialTheme.colorScheme.onSurface
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    BigStat("Call State", callState!!, valueColor = callColor)
                 }
             }
         }
