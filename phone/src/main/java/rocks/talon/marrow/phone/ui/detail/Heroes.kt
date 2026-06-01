@@ -1227,6 +1227,7 @@ fun EnvironmentHero(vm: MarrowViewModel, section: Section, isPhone: Boolean) {
     val tiltAngleDeg by vm.tiltAngleDeg.collectAsState()
     val magneticFieldUt by vm.magneticFieldUt.collectAsState()
     val proximityDistanceCm by vm.proximityDistanceCm.collectAsState()
+    val relativeHumidityPct by vm.relativeHumidityPct.collectAsState()
 
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
@@ -1276,6 +1277,11 @@ fun EnvironmentHero(vm: MarrowViewModel, section: Section, isPhone: Boolean) {
                     if (isNear) "Near" else "%.1f cm".format(proxCm),
                     valueColor = proxColor,
                 )
+            }
+            val humidityPct = relativeHumidityPct
+            if (isPhone && humidityPct != null) {
+                Spacer(Modifier.height(12.dp))
+                BigStat("Humidity", "%.1f%% RH".format(humidityPct))
             }
             if (isPhone) {
                 Spacer(Modifier.height(16.dp))
