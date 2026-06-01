@@ -133,6 +133,9 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     /** Device's primary IPv4 address (e.g. "192.168.1.42"). null when no active IPv4 interface. */
     private val _localIpV4 = MutableStateFlow<String?>(null)
     val localIpV4: StateFlow<String?> = _localIpV4.asStateFlow()
+    /** Device's primary global-scope IPv6 address. null when no active global IPv6 interface. */
+    private val _localIpV6 = MutableStateFlow<String?>(null)
+    val localIpV6: StateFlow<String?> = _localIpV6.asStateFlow()
 
     private val _wifiSsid = MutableStateFlow<String?>(null)
     val wifiSsid: StateFlow<String?> = _wifiSsid.asStateFlow()
@@ -540,6 +543,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _wifiSsid.value = LiveStats.wifiSsid(ctx)
                 // Local IPv4 address — NetworkInterface, no permissions needed
                 _localIpV4.value = LiveStats.localIpV4()
+                // Local IPv6 address — NetworkInterface, no permissions needed; global scope only
+                _localIpV6.value = LiveStats.localIpV6()
                 // Charge time remaining — BatteryManager estimate, -1L when discharging or unavailable
                 _chargeTimeRemainingMs.value = LiveStats.chargeTimeRemainingMs(ctx)
                 // Screen brightness — Settings.System.SCREEN_BRIGHTNESS, no permissions needed
