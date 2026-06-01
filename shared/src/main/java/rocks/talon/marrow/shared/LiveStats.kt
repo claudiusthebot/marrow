@@ -1245,6 +1245,22 @@ object LiveStats {
     }.getOrNull()
 
     /**
+     * Current notification stream volume as a percentage (0–100).
+     * Reads [android.media.AudioManager.getStreamVolume] /
+     * [android.media.AudioManager.getStreamMaxVolume] for [STREAM_NOTIFICATION].
+     * Returns null when [AudioManager] is unavailable or max volume is 0.
+     * No permissions required.
+     */
+    fun notificationVolumePct(context: Context): Int? = runCatching {
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            ?: return@runCatching null
+        val max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_NOTIFICATION)
+        if (max <= 0) return@runCatching null
+        val cur = am.getStreamVolume(android.media.AudioManager.STREAM_NOTIFICATION)
+        (cur * 100 / max).coerceIn(0, 100)
+    }.getOrNull()
+
+    /**
      * Whether music is currently active (playing or paused-recently) via
      * [android.media.AudioManager.isMusicActive]. No permissions required.
      * Returns null when [AudioManager] is unavailable.
