@@ -210,6 +210,13 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _ambientTempC = MutableStateFlow<Float?>(null)
     val ambientTempC: StateFlow<Float?> = _ambientTempC.asStateFlow()
 
+    /** Relative humidity percentage from [Sensor.TYPE_RELATIVE_HUMIDITY]. null before the
+     *  first event or when the device has no humidity sensor. This sensor is rare on
+     *  consumer phones — present on some Samsung devices but absent on most Pixels and
+     *  other flagships. Silent no-op when unavailable. */
+    private val _relativeHumidityPct = MutableStateFlow<Float?>(null)
+    val relativeHumidityPct: StateFlow<Float?> = _relativeHumidityPct.asStateFlow()
+
     /**
      * Steps accumulated since the last device reboot from [Sensor.TYPE_STEP_COUNTER].
      * null before the first event fires or on devices without a hardware step counter.
@@ -438,6 +445,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private var linearAccelListener: SensorEventListener? = null
     private var magnetometerListener: SensorEventListener? = null
     private var proximityListener: SensorEventListener? = null
+    private var humidityListener: SensorEventListener? = null
 
     init {
         refreshPhone()
@@ -446,6 +454,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         startLightSensor()
         startPressureSensor()
         startAmbientTempSensor()
+        startRelativeHumiditySensor()
         startStepCounterSensor()
         startRotationVectorSensor()
         startGravitySensor()
@@ -668,6 +677,28 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
         }
         ambientTempSensorListener = listener
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
+    /**
+     * Registers a [SensorEventListener] for [Sensor.TYPE_RELATIVE_HUMIDITY] using
+     * [SensorManager.SENSOR_DELAY_NORMAL]. Events fire when humidity changes; values
+     * are in % RH (0.0–100.0). Follows the same push-based pattern as
+     * [startAmbientTempSensor] — rare on consumer phones (absent on most Pixels,
+     * present on some Samsung devices). Silent no-op when sensor unavailable.
+     */
+    private fun startRelativeHumiditySensor() {
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_RELATIVE_HUMIDITY) ?: return
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                val pct = event?.values?.firstOrNull() ?: return
+                _relativeHumidityPct.value = pct
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        humidityListener = listener
         sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
@@ -930,6 +961,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         linearAccelListener?.let { sm?.unregisterListener(it) }
         magnetometerListener?.let { sm?.unregisterListener(it) }
         proximityListener?.let { sm?.unregisterListener(it) }
+        humidityListener?.let { sm?.unregisterListener(it) }
         super.onCleared()
     }
 }
