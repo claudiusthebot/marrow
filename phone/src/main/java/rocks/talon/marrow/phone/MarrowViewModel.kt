@@ -383,6 +383,11 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _cellular = MutableStateFlow<LiveStats.Cellular?>(null)
     val cellular: StateFlow<LiveStats.Cellular?> = _cellular.asStateFlow()
 
+    /** Current phone call state: "Idle", "Ringing", or "In Call". Null on devices
+     *  without telephony or when READ_BASIC_PHONE_STATE is unavailable (API < 31). */
+    private val _callState = MutableStateFlow<String?>(null)
+    val callState: StateFlow<String?> = _callState.asStateFlow()
+
     // -- Location ----------------------------------------------------------------
 
     /**
@@ -566,6 +571,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _screenTimeoutMs.value = LiveStats.screenTimeoutMs(ctx)
                 // Cellular stats — READ_BASIC_PHONE_STATE (normal, API 33+); null on Wi-Fi-only devices
                 _cellular.value = LiveStats.cellularInfo(ctx)
+                // Call state — READ_BASIC_PHONE_STATE (normal, API 31+); null on API 30 or Wi-Fi-only
+                _callState.value = LiveStats.callState(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
             }
