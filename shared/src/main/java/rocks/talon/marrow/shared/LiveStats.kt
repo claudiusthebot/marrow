@@ -1149,6 +1149,30 @@ object LiveStats {
         else                                                     -> null
     }
 
+
+    /**
+     * Current phone call state as a human-readable label.
+     *
+     * Reads [android.telephony.TelephonyManager.callState]:
+     * CALL_STATE_IDLE → "Idle", CALL_STATE_RINGING → "Ringing",
+     * CALL_STATE_OFFHOOK → "In Call".
+     *
+     * [android.Manifest.permission.READ_BASIC_PHONE_STATE] (normal, API 31+) is already
+     * declared in the phone manifest from [CellularHero]. On API 30 a SecurityException
+     * may be thrown — the [runCatching] wrapper returns null gracefully in that case.
+     * Always returns null on devices without telephony hardware.
+     */
+    fun callState(context: Context): String? = runCatching {
+        val tm = context.getSystemService(Context.TELEPHONY_SERVICE)
+            as? android.telephony.TelephonyManager ?: return@runCatching null
+        when (tm.callState) {
+            android.telephony.TelephonyManager.CALL_STATE_IDLE    -> "Idle"
+            android.telephony.TelephonyManager.CALL_STATE_RINGING -> "Ringing"
+            android.telephony.TelephonyManager.CALL_STATE_OFFHOOK -> "In Call"
+            else -> null
+        }
+    }.getOrNull()
+
     // -- Audio -------------------------------------------------------------------
 
     /** Current ringer mode from [android.media.AudioManager.getRingerMode]. */
