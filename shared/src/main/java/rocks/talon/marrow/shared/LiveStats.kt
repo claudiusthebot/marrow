@@ -11,6 +11,7 @@ import android.os.Environment
 import android.os.StatFs
 import java.io.File
 import java.net.Inet4Address
+import java.net.Inet6Address
 import java.net.NetworkInterface
 import kotlin.math.roundToInt
 
@@ -754,6 +755,23 @@ object LiveStats {
             ?.flatMap { it.inetAddresses.asSequence() }
             ?.firstOrNull { !it.isLoopbackAddress && it is Inet4Address }
             ?.hostAddress
+    } catch (_: Exception) { null }
+
+    /**
+     * Returns the device's primary global-scope IPv6 address (e.g. "2001:db8::1"), or null if
+     * the device has no active global-scope IPv6 interface (link-local fe80:: addresses are
+     * excluded as they are not routable).
+     *
+     * Uses [NetworkInterface.getNetworkInterfaces] which works on all API levels and
+     * does not require any permissions.
+     */
+    fun localIpV6(): String? = try {
+        NetworkInterface.getNetworkInterfaces()
+            ?.asSequence()
+            ?.flatMap { it.inetAddresses.asSequence() }
+            ?.firstOrNull { !it.isLoopbackAddress && !it.isLinkLocalAddress && it is Inet6Address }
+            ?.hostAddress
+            ?.substringBefore('%')   // strip any zone-id suffix (e.g. %wlan0)
     } catch (_: Exception) { null }
 
     // -- Charge time remaining --------------------------------------------------

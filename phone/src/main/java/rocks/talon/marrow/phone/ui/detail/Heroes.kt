@@ -1050,6 +1050,7 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
     val wifiFrequencyMhz by vm.wifiFrequencyMhz.collectAsState()
     val wifiStandard by vm.wifiStandard.collectAsState()
     val localIpV4 by vm.localIpV4.collectAsState()
+    val localIpV6 by vm.localIpV6.collectAsState()
     val isAirplaneModeOn by vm.isAirplaneModeOn.collectAsState()
     val isNfcEnabled by vm.isNfcEnabled.collectAsState()
     val isBluetoothEnabled by vm.isBluetoothEnabled.collectAsState()
@@ -1110,6 +1111,11 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
             if (ip != null) {
                 Spacer(Modifier.height(8.dp))
                 BigStat("IP Address", ip)
+            }
+            val ip6 = localIpV6
+            if (ip6 != null) {
+                Spacer(Modifier.height(8.dp))
+                BigStat("IPv6 Addr", ip6)
             }
             // Live throughput — shown after the first two polling ticks provide a rate
             if (rxBps > 0L || txBps > 0L) {
