@@ -355,6 +355,11 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _notificationVolumePct = MutableStateFlow<Int?>(null)
     val notificationVolumePct: StateFlow<Int?> = _notificationVolumePct.asStateFlow()
 
+    /** Current system stream volume as a percentage (0–100), polled from [LiveStats.systemVolumePct].
+     *  null until first live-loop tick. No permissions required. */
+    private val _systemVolumePct = MutableStateFlow<Int?>(null)
+    val systemVolumePct: StateFlow<Int?> = _systemVolumePct.asStateFlow()
+
     // -- Display mode ------------------------------------------------------------
 
     /** Whether the system is currently in dark mode. Reads [android.content.res.Configuration.uiMode].
@@ -566,10 +571,11 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _isMusicActive.value = LiveStats.isMusicActive(ctx)
                 // DND mode — NotificationManager.currentInterruptionFilter, no permissions needed
                 _dndMode.value = LiveStats.dndMode(ctx)
-                // Ring, alarm, and notification volume — AudioManager, no permissions needed
+                // Ring, alarm, notification, and system volume — AudioManager, no permissions needed
                 _ringVolumePct.value = LiveStats.ringVolumePct(ctx)
                 _alarmVolumePct.value = LiveStats.alarmVolumePct(ctx)
                 _notificationVolumePct.value = LiveStats.notificationVolumePct(ctx)
+                _systemVolumePct.value = LiveStats.systemVolumePct(ctx)
                 // Dark mode — Configuration.uiMode, no permissions needed
                 _isDarkMode.value = LiveStats.isDarkMode(ctx)
                 // Auto-rotate — Settings.System.ACCELEROMETER_ROTATION, no permissions needed
