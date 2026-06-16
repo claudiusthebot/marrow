@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -942,6 +943,7 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
         "${dm.widthPixels}×${dm.heightPixels}"
     }
     val densityDpiVal = remember { ctx.resources.displayMetrics.densityDpi }
+    val fontScaleVal = LocalConfiguration.current.fontScale
     val res = section.rows.firstOrNull { it.label == "Resolution" }?.value ?: "—"
     val dpi = section.rows.firstOrNull { it.label == "Density" }?.value ?: "—"
     val refresh = section.rows.firstOrNull { it.label == "Refresh rate" }?.value ?: "—"
@@ -1029,6 +1031,8 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
             BigStat("Resolution", resolutionStr)
             Spacer(Modifier.height(4.dp))
             BigStat("PPI", "$densityDpiVal dpi")
+            Spacer(Modifier.height(4.dp))
+            BigStat("Font Scale", "%.2f×".format(fontScaleVal))
         }
     }
 }
@@ -1401,6 +1405,7 @@ fun AudioHero(vm: MarrowViewModel, section: Section) {
     val notificationVolumePct by vm.notificationVolumePct.collectAsState()
     val systemVolumePct by vm.systemVolumePct.collectAsState()
     val voiceCallVolumePct by vm.voiceCallVolumePct.collectAsState()
+    val accessibilityVolumePct by vm.accessibilityVolumePct.collectAsState()
 
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
@@ -1413,7 +1418,7 @@ fun AudioHero(vm: MarrowViewModel, section: Section) {
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     )
                     Text(
-                        "Ringer mode · media · ring · alarm · notification · system · call volume · DND",
+                        "Ringer mode · media · ring · alarm · notification · system · call · accessibility volume · DND",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1465,6 +1470,10 @@ fun AudioHero(vm: MarrowViewModel, section: Section) {
             voiceCallVolumePct?.let { vol ->
                 Spacer(Modifier.height(8.dp))
                 BigStat("Call Vol", "$vol%")
+            }
+            accessibilityVolumePct?.let { vol ->
+                Spacer(Modifier.height(8.dp))
+                BigStat("A11y Vol", "$vol%")
             }
             dndMode?.let { mode ->
                 val dndColor = when (mode) {

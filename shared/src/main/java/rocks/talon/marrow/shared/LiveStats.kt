@@ -1314,6 +1314,22 @@ object LiveStats {
     }.getOrNull()
 
     /**
+     * Accessibility audio stream volume as a percentage (0–100).
+     *
+     * Reads [android.media.AudioManager.STREAM_ACCESSIBILITY] — the stream used by
+     * screen readers and other accessibility services. API 26+. No permissions required.
+     * Returns null when [AudioManager] is unavailable or the stream has no valid max.
+     */
+    fun accessibilityVolumePct(context: Context): Int? = runCatching {
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            ?: return@runCatching null
+        val max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_ACCESSIBILITY)
+        if (max <= 0) return@runCatching null
+        val cur = am.getStreamVolume(android.media.AudioManager.STREAM_ACCESSIBILITY)
+        (cur * 100 / max).coerceIn(0, 100)
+    }.getOrNull()
+
+    /**
      * Whether music is currently active (playing or paused-recently) via
      * [android.media.AudioManager.isMusicActive]. No permissions required.
      * Returns null when [AudioManager] is unavailable.
