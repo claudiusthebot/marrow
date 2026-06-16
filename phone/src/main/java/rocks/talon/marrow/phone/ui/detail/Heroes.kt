@@ -600,6 +600,10 @@ fun MemoryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val swapFrac = if (swapTotal > 0L) (swapUsed.toFloat() / swapTotal.toFloat()).coerceIn(0f, 1f) else 0f
     val animatedSwap by animateFloatAsState(targetValue = swapFrac, animationSpec = tween(500), label = "swap-frac")
 
+    // Kill threshold — phone only (bytes at which Android starts killing background processes)
+    val thresholdBytes = if (!isWatch) mem?.thresholdBytes ?: 0L else 0L
+    val thresholdMb = thresholdBytes / (1024L * 1024L)
+
     // Memory pressure level — phone only
     val lowMemory = !isWatch && mem?.lowMemory == true
     val pressure = when {
@@ -703,6 +707,11 @@ fun MemoryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = pressure.color,
                 )
+            }
+            // Kill threshold BigStat — only shown when data is available (phone only)
+            if (!isWatch && thresholdMb > 0L) {
+                Spacer(Modifier.height(16.dp))
+                BigStat("Kill Threshold", "$thresholdMb MB")
             }
         }
     }
