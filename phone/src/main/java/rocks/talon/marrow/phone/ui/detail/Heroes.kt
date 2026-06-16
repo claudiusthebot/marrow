@@ -1434,6 +1434,7 @@ fun AudioHero(vm: MarrowViewModel, section: Section) {
     val systemVolumePct by vm.systemVolumePct.collectAsState()
     val voiceCallVolumePct by vm.voiceCallVolumePct.collectAsState()
     val accessibilityVolumePct by vm.accessibilityVolumePct.collectAsState()
+    val audioOutputRoute by vm.audioOutputRoute.collectAsState()
 
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
@@ -1446,7 +1447,7 @@ fun AudioHero(vm: MarrowViewModel, section: Section) {
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     )
                     Text(
-                        "Ringer mode · media · ring · alarm · notification · system · call · accessibility volume · DND",
+                        "Ringer mode · media · ring · alarm · notification · system · call · accessibility volume · output route · DND",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1502,6 +1503,15 @@ fun AudioHero(vm: MarrowViewModel, section: Section) {
             accessibilityVolumePct?.let { vol ->
                 Spacer(Modifier.height(8.dp))
                 BigStat("A11y Vol", "$vol%")
+            }
+            audioOutputRoute?.let { route ->
+                val routeColor = when (route) {
+                    "Bluetooth" -> MaterialTheme.colorScheme.primary
+                    "Wired"     -> MaterialTheme.colorScheme.secondary
+                    else        -> MaterialTheme.colorScheme.onSurface
+                }
+                Spacer(Modifier.height(8.dp))
+                BigStat("Output", route, valueColor = routeColor)
             }
             dndMode?.let { mode ->
                 val dndColor = when (mode) {

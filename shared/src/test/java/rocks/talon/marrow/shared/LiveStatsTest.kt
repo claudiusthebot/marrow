@@ -649,6 +649,57 @@ class LiveStatsTest {
         assertNull(LiveStats.wifiChannelFromMhz(0))
         assertNull(LiveStats.wifiChannelFromMhz(3000))
         assertNull(LiveStats.wifiChannelFromMhz(9999))
+
+    // ── audioOutputLabel ─────────────────────────────────────────────────────
+
+    @Test fun audioOutputLabel_bluetooth_a2dp() {
+        // TYPE_BLUETOOTH_A2DP=13 → "Bluetooth"
+        assertEquals("Bluetooth", LiveStats.audioOutputLabel(listOf(13)))
+    }
+
+    @Test fun audioOutputLabel_bluetooth_ble_headset() {
+        // TYPE_BLE_HEADSET=26 → "Bluetooth"
+        assertEquals("Bluetooth", LiveStats.audioOutputLabel(listOf(26)))
+    }
+
+    @Test fun audioOutputLabel_bluetooth_sco() {
+        // TYPE_BLUETOOTH_SCO=7 → "Bluetooth" (used for calls)
+        assertEquals("Bluetooth", LiveStats.audioOutputLabel(listOf(7)))
+    }
+
+    @Test fun audioOutputLabel_wired_headphones() {
+        // TYPE_WIRED_HEADPHONES=8 → "Wired"
+        assertEquals("Wired", LiveStats.audioOutputLabel(listOf(8)))
+    }
+
+    @Test fun audioOutputLabel_wired_headset() {
+        // TYPE_WIRED_HEADSET=3 → "Wired"
+        assertEquals("Wired", LiveStats.audioOutputLabel(listOf(3)))
+    }
+
+    @Test fun audioOutputLabel_speaker() {
+        // TYPE_BUILTIN_SPEAKER=2 → "Speaker"
+        assertEquals("Speaker", LiveStats.audioOutputLabel(listOf(2)))
+    }
+
+    @Test fun audioOutputLabel_earpiece() {
+        // TYPE_BUILTIN_EARPIECE=1 → "Earpiece"
+        assertEquals("Earpiece", LiveStats.audioOutputLabel(listOf(1)))
+    }
+
+    @Test fun audioOutputLabel_bluetooth_wins_over_wired() {
+        // Bluetooth takes priority over wired when both present
+        assertEquals("Bluetooth", LiveStats.audioOutputLabel(listOf(13, 8)))
+    }
+
+    @Test fun audioOutputLabel_empty_list_returns_null() {
+        // No output devices → null
+        assertNull(LiveStats.audioOutputLabel(emptyList()))
+    }
+
+    @Test fun audioOutputLabel_unknown_type_returns_null() {
+        // Unknown/unrecognised device type → null (no match)
+        assertNull(LiveStats.audioOutputLabel(listOf(99)))
     }
 
 }

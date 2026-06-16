@@ -382,6 +382,12 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _accessibilityVolumePct = MutableStateFlow<Int?>(null)
     val accessibilityVolumePct: StateFlow<Int?> = _accessibilityVolumePct.asStateFlow()
 
+    /** Current audio output route: "Bluetooth", "Wired", "Earpiece", or "Speaker".
+     *  Derived from [android.media.AudioManager.getDevices] — zero permissions required.
+     *  null until first live-loop tick or when no known output device is active. */
+    private val _audioOutputRoute = MutableStateFlow<String?>(null)
+    val audioOutputRoute: StateFlow<String?> = _audioOutputRoute.asStateFlow()
+
     // -- Display mode ------------------------------------------------------------
 
     /** Whether the system is currently in dark mode. Reads [android.content.res.Configuration.uiMode].
@@ -605,6 +611,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _voiceCallVolumePct.value = LiveStats.voiceCallVolumePct(ctx)
                 // Accessibility volume — STREAM_ACCESSIBILITY (API 26+, minSdk=30), no permissions needed
                 _accessibilityVolumePct.value = LiveStats.accessibilityVolumePct(ctx)
+                // Audio output route — AudioManager.getDevices(GET_DEVICES_OUTPUTS), no permissions needed
+                _audioOutputRoute.value = LiveStats.audioOutputRoute(ctx)
                 // Dark mode — Configuration.uiMode, no permissions needed
                 _isDarkMode.value = LiveStats.isDarkMode(ctx)
                 // Auto-rotate — Settings.System.ACCELEROMETER_ROTATION, no permissions needed
