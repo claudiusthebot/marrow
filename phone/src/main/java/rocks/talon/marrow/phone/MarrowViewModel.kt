@@ -370,6 +370,12 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _systemVolumePct = MutableStateFlow<Int?>(null)
     val systemVolumePct: StateFlow<Int?> = _systemVolumePct.asStateFlow()
 
+    /** Current voice-call stream volume as a percentage (0–100), polled from [LiveStats.voiceCallVolumePct].
+     *  Reflects [android.media.AudioManager.STREAM_VOICE_CALL] — the in-ear / hands-free call volume.
+     *  null until first live-loop tick. No permissions required. */
+    private val _voiceCallVolumePct = MutableStateFlow<Int?>(null)
+    val voiceCallVolumePct: StateFlow<Int?> = _voiceCallVolumePct.asStateFlow()
+
     // -- Display mode ------------------------------------------------------------
 
     /** Whether the system is currently in dark mode. Reads [android.content.res.Configuration.uiMode].
@@ -585,11 +591,12 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _isMusicActive.value = LiveStats.isMusicActive(ctx)
                 // DND mode — NotificationManager.currentInterruptionFilter, no permissions needed
                 _dndMode.value = LiveStats.dndMode(ctx)
-                // Ring, alarm, notification, and system volume — AudioManager, no permissions needed
+                // Ring, alarm, notification, system, and voice-call volume — AudioManager, no permissions needed
                 _ringVolumePct.value = LiveStats.ringVolumePct(ctx)
                 _alarmVolumePct.value = LiveStats.alarmVolumePct(ctx)
                 _notificationVolumePct.value = LiveStats.notificationVolumePct(ctx)
                 _systemVolumePct.value = LiveStats.systemVolumePct(ctx)
+                _voiceCallVolumePct.value = LiveStats.voiceCallVolumePct(ctx)
                 // Dark mode — Configuration.uiMode, no permissions needed
                 _isDarkMode.value = LiveStats.isDarkMode(ctx)
                 // Auto-rotate — Settings.System.ACCELEROMETER_ROTATION, no permissions needed

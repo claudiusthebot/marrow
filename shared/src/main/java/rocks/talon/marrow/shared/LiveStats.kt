@@ -1295,6 +1295,25 @@ object LiveStats {
     }.getOrNull()
 
     /**
+     * Current voice-call volume as a 0–100 % integer.
+     *
+     * Reads [android.media.AudioManager.STREAM_VOICE_CALL] — the in-ear earpiece / hands-free
+     * call volume, distinct from the ringer, media, and notification streams. Shows "—" when
+     * no call is in progress but the slot is always present and adjustable by the user.
+     * Zero permissions required.
+     *
+     * Returns null when [AudioManager] is unavailable or the stream has no valid max.
+     */
+    fun voiceCallVolumePct(context: Context): Int? = runCatching {
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            ?: return@runCatching null
+        val max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_VOICE_CALL)
+        if (max <= 0) return@runCatching null
+        val cur = am.getStreamVolume(android.media.AudioManager.STREAM_VOICE_CALL)
+        (cur * 100 / max).coerceIn(0, 100)
+    }.getOrNull()
+
+    /**
      * Whether music is currently active (playing or paused-recently) via
      * [android.media.AudioManager.isMusicActive]. No permissions required.
      * Returns null when [AudioManager] is unavailable.
