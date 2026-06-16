@@ -572,4 +572,43 @@ class LiveStatsTest {
         assertEquals(0, LiveStats.chargeCounterMah(999))
     }
 
+    // ── Memory.thresholdBytes — kill threshold MB display ──────────────────────
+
+    @Test fun memory_threshold_mb_typical() {
+        // 256 MB threshold (common on phones with ~4–6 GB RAM)
+        val mem = LiveStats.Memory(
+            totalBytes = 6L * 1024 * 1024 * 1024,
+            availBytes = 2L * 1024 * 1024 * 1024,
+            thresholdBytes = 256L * 1024 * 1024,
+            lowMemory = false,
+        )
+        val thresholdMb = mem.thresholdBytes / (1024L * 1024L)
+        assertEquals(256L, thresholdMb)
+    }
+
+    @Test fun memory_threshold_mb_zero_when_unavailable() {
+        // thresholdBytes = 0 → display guard must suppress the BigStat
+        val mem = LiveStats.Memory(
+            totalBytes = 4L * 1024 * 1024 * 1024,
+            availBytes = 2L * 1024 * 1024 * 1024,
+            thresholdBytes = 0L,
+            lowMemory = false,
+        )
+        val thresholdMb = mem.thresholdBytes / (1024L * 1024L)
+        assertEquals(0L, thresholdMb)
+    }
+
+    @Test fun memory_threshold_mb_rounds_down() {
+        // 300.5 MB worth of bytes → should show 300 MB (integer division)
+        val bytes = (300.5 * 1024 * 1024).toLong()
+        val mem = LiveStats.Memory(
+            totalBytes = 8L * 1024 * 1024 * 1024,
+            availBytes = 4L * 1024 * 1024 * 1024,
+            thresholdBytes = bytes,
+            lowMemory = false,
+        )
+        val thresholdMb = mem.thresholdBytes / (1024L * 1024L)
+        assertEquals(300L, thresholdMb)
+    }
+
 }
