@@ -611,4 +611,43 @@ class LiveStatsTest {
         assertEquals(300L, thresholdMb)
     }
 
+    // ── wifiChannelFromMhz ────────────────────────────────────────────────────
+
+    @Test fun wifiChannelFromMhz_24ghz_channel1() {
+        // 2412 MHz = 2.4 GHz channel 1 (first standard 2.4 GHz channel)
+        assertEquals(1, LiveStats.wifiChannelFromMhz(2412))
+    }
+
+    @Test fun wifiChannelFromMhz_24ghz_channel6() {
+        // 2437 MHz = 2.4 GHz channel 6 (most common default SSID channel)
+        assertEquals(6, LiveStats.wifiChannelFromMhz(2437))
+    }
+
+    @Test fun wifiChannelFromMhz_24ghz_channel14_japan() {
+        // 2484 MHz = channel 14, special-case Japan-only frequency
+        assertEquals(14, LiveStats.wifiChannelFromMhz(2484))
+    }
+
+    @Test fun wifiChannelFromMhz_5ghz_channel36() {
+        // 5180 MHz = 5 GHz channel 36 (first 5 GHz channel)
+        assertEquals(36, LiveStats.wifiChannelFromMhz(5180))
+    }
+
+    @Test fun wifiChannelFromMhz_5ghz_channel149() {
+        // 5745 MHz = 5 GHz channel 149 (common in North America)
+        assertEquals(149, LiveStats.wifiChannelFromMhz(5745))
+    }
+
+    @Test fun wifiChannelFromMhz_6ghz_channel1() {
+        // 5955 MHz = 6 GHz channel 1 (first Wi-Fi 6E channel)
+        assertEquals(1, LiveStats.wifiChannelFromMhz(5955))
+    }
+
+    @Test fun wifiChannelFromMhz_out_of_band_returns_null() {
+        // Frequency not in any known Wi-Fi band → null
+        assertNull(LiveStats.wifiChannelFromMhz(0))
+        assertNull(LiveStats.wifiChannelFromMhz(3000))
+        assertNull(LiveStats.wifiChannelFromMhz(9999))
+    }
+
 }

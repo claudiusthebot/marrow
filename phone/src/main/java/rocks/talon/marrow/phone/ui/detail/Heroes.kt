@@ -1128,6 +1128,11 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
                     else               -> "6 GHz"
                 }
                 BigStat("Wi-Fi Band", bandLabel)
+                Spacer(Modifier.height(8.dp))
+                val channel = LiveStats.wifiChannelFromMhz(liveFreqMhz)
+                if (channel != null) {
+                    BigStat("Wi-Fi Ch", "$channel")
+                }
             }
             val wifiStd = wifiStandard
             if (wifiStd != null) {
