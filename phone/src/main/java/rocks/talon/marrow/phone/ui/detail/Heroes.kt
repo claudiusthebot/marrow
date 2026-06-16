@@ -207,6 +207,11 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                     Spacer(Modifier.height(8.dp))
                     BigStat("Cycles", "$cycleCnt")
                 }
+                val chargeMah = battery?.chargeCounterMah ?: -1
+                if (!isWatch && chargeMah >= 0) {
+                    Spacer(Modifier.height(8.dp))
+                    BigStat("Charge", "%,d mAh".format(chargeMah))
+                }
                 if (!isWatch && uptimeSeconds > 0L) {
                     Spacer(Modifier.height(8.dp))
                     BigStat("Uptime", LiveStats.formatUptime(uptimeSeconds))

@@ -535,4 +535,41 @@ class LiveStatsTest {
         // Any undocumented status code should be gracefully labelled
         assertEquals("Unknown", LiveStats.thermalStatusLabel(99))
     }
+    // -- chargeCounterMah ----------------------------------------------------
+
+    @Test fun chargeCounterMah_typical_4000mah() {
+        // 4,000,000 µAh → 4,000 mAh
+        assertEquals(4000, LiveStats.chargeCounterMah(4_000_000))
+    }
+
+    @Test fun chargeCounterMah_typical_3847mah() {
+        // 3,847,412 µAh → 3,847 mAh (truncated, not rounded)
+        assertEquals(3847, LiveStats.chargeCounterMah(3_847_412))
+    }
+
+    @Test fun chargeCounterMah_zero_returns_minus_one() {
+        // BatteryManager returns 0 when sensor is absent
+        assertEquals(-1, LiveStats.chargeCounterMah(0))
+    }
+
+    @Test fun chargeCounterMah_negative_returns_minus_one() {
+        // Some OEMs or emulators return -1 for unavailable
+        assertEquals(-1, LiveStats.chargeCounterMah(-1))
+    }
+
+    @Test fun chargeCounterMah_min_value_returns_minus_one() {
+        // Int.MIN_VALUE is the sentinel for "not available" from getIntProperty
+        assertEquals(-1, LiveStats.chargeCounterMah(Int.MIN_VALUE))
+    }
+
+    @Test fun chargeCounterMah_one_mah_boundary() {
+        // 1,000 µAh → exactly 1 mAh
+        assertEquals(1, LiveStats.chargeCounterMah(1_000))
+    }
+
+    @Test fun chargeCounterMah_below_one_mah_returns_zero() {
+        // 999 µAh → 0 mAh (truncated) — note: still positive so not unknown
+        assertEquals(0, LiveStats.chargeCounterMah(999))
+    }
+
 }
