@@ -41,6 +41,9 @@ object LiveStats {
         val healthPercent: Int = -1,      // 0..100, -1 unknown
         /** Charge cycle count from sysfs. -1 when absent (emulator / OEM restriction). */
         val cycleCount: Int = -1,          // ≥0, -1 unknown
+        /** Instantaneous charge from BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER converted
+         *  to mAh (divide µAh by 1000). -1 when unavailable (emulator / non-standard OEM). */
+        val chargeCounterMah: Int = -1,    // ≥0 mAh, -1 unknown
     ) {
         enum class PlugType { UNPLUGGED, AC, USB, WIRELESS, DOCK }
 
@@ -104,6 +107,9 @@ object LiveStats {
             healthPercent = healthPct,
             cycleCount = readLong("/sys/class/power_supply/battery/cycle_count")
                 .let { if (it > 0L) it.toInt() else -1 },
+            chargeCounterMah = chargeCounterMah(
+                mgr?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER) ?: 0,
+            ),
         )
     }
 
@@ -126,6 +132,17 @@ object LiveStats {
         return ((chargeFull.toFloat() / chargeFullDesign.toFloat()) * 100f)
             .roundToInt().coerceIn(0, 100)
     }
+
+    /**
+     * Convert a raw [BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER] µAh value to mAh.
+     *
+     * BatteryManager returns the property as µAh (or 0 / negative when unavailable).
+     * Exposed as a pure function so it can be unit-tested without an Android context.
+     *
+     * @param uah Raw value from [BatteryManager.getIntProperty] in µAh.
+     * @return Charge in mAh, or -1 when [uah] ≤ 0 (sensor absent / emulator).
+     */
+    internal fun chargeCounterMah(uah: Int): Int = if (uah > 0) uah / 1000 else -1
 
     // -- Memory ------------------------------------------------------------------
 
