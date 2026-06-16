@@ -257,6 +257,7 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val abis = section.rows.firstOrNull { it.label == "ABIs" }?.value
         ?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
     val governor = cores.firstOrNull { it.governor != null }?.governor
+    val peakFreqMhz = cores.filter { it.curMhz > 0 }.maxOfOrNull { it.curMhz }
 
     // Temperature color: mirrors BatteryHero tint thresholds.
     // Green  < 60 °C — normal operating range.
@@ -388,6 +389,10 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
             if (!isWatch && governor != null) {
                 Spacer(Modifier.height(16.dp))
                 BigStat("Governor", governor)
+            }
+            if (!isWatch && peakFreqMhz != null) {
+                Spacer(Modifier.height(16.dp))
+                BigStat("Peak Freq", "%.1f GHz".format(peakFreqMhz / 1000f))
             }
             if (abis.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
