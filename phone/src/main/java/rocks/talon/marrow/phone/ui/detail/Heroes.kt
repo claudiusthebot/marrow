@@ -385,6 +385,10 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                 }
                 BigStat("CPU Load", "${cpuUsage.toInt()}%", valueColor = loadColor)
             }
+            if (!isWatch && governor != null) {
+                Spacer(Modifier.height(16.dp))
+                BigStat("Governor", governor)
+            }
             if (abis.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
                 FlowRow(
