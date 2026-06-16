@@ -376,6 +376,12 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _voiceCallVolumePct = MutableStateFlow<Int?>(null)
     val voiceCallVolumePct: StateFlow<Int?> = _voiceCallVolumePct.asStateFlow()
 
+    /** Accessibility audio stream volume as a percentage (0–100).
+     *  Reflects [android.media.AudioManager.STREAM_ACCESSIBILITY] (API 26+).
+     *  null until first live-loop tick. No permissions required. */
+    private val _accessibilityVolumePct = MutableStateFlow<Int?>(null)
+    val accessibilityVolumePct: StateFlow<Int?> = _accessibilityVolumePct.asStateFlow()
+
     // -- Display mode ------------------------------------------------------------
 
     /** Whether the system is currently in dark mode. Reads [android.content.res.Configuration.uiMode].
@@ -597,6 +603,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _notificationVolumePct.value = LiveStats.notificationVolumePct(ctx)
                 _systemVolumePct.value = LiveStats.systemVolumePct(ctx)
                 _voiceCallVolumePct.value = LiveStats.voiceCallVolumePct(ctx)
+                // Accessibility volume — STREAM_ACCESSIBILITY (API 26+, minSdk=30), no permissions needed
+                _accessibilityVolumePct.value = LiveStats.accessibilityVolumePct(ctx)
                 // Dark mode — Configuration.uiMode, no permissions needed
                 _isDarkMode.value = LiveStats.isDarkMode(ctx)
                 // Auto-rotate — Settings.System.ACCELEROMETER_ROTATION, no permissions needed
