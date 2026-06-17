@@ -192,6 +192,14 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _activeNetworkType = MutableStateFlow<String?>(null)
     val activeNetworkType: StateFlow<String?> = _activeNetworkType.asStateFlow()
 
+    /**
+     * Network round-trip time in milliseconds — TCP connect latency to 8.8.8.8:53.
+     * Updated every ~10 s by a dedicated [pingJob] coroutine on [Dispatchers.IO].
+     * Null until the first measurement completes or when the device is offline.
+     */
+    private val _networkRttMs = MutableStateFlow<Int?>(null)
+    val networkRttMs: StateFlow<Int?> = _networkRttMs.asStateFlow()
+
     /** Cumulative bytes received across all interfaces since the last device reboot.
      *  Polled each live-loop tick from [LiveStats.totalRxBytes].
      *  null when [android.net.TrafficStats.UNSUPPORTED] is returned by the system. */
@@ -480,6 +488,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     private var liveJob: Job? = null
+    private var pingJob: Job? = null
     private var sensorManager: SensorManager? = null
     private var locationManager: android.location.LocationManager? = null
     private var locationListener: android.location.LocationListener? = null
@@ -500,6 +509,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         refreshPhone()
         requestWatchInfo()
         startLiveLoop()
+        startPingLoop()
         startLightSensor()
         startPressureSensor()
         startAmbientTempSensor()
@@ -675,6 +685,22 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _callState.value = LiveStats.callState(ctx)
                 val intervalMs = (settings.value.refreshIntervalSeconds.coerceIn(1, 60)) * 1000L
                 delay(intervalMs)
+            }
+        }
+    }
+
+    /**
+     * Background coroutine that probes network RTT every 10 seconds via TCP connect to 8.8.8.8:53.
+     * Runs on [Dispatchers.IO] to keep the blocking connect call off the main thread.
+     * A separate coroutine (rather than embedding in the live loop) avoids adding up to 1 s of
+     * [LiveStats.networkRttMs] timeout overhead to every live-loop tick when offline.
+     */
+    private fun startPingLoop() {
+        pingJob?.cancel()
+        pingJob = viewModelScope.launch(Dispatchers.IO) {
+            while (true) {
+                _networkRttMs.value = LiveStats.networkRttMs()
+                delay(10_000L)
             }
         }
     }
@@ -1048,6 +1074,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         liveJob?.cancel()
+        pingJob?.cancel()
         locationListener?.let { locationManager?.removeUpdates(it) }
         lightSensorListener?.let { sensorManager?.unregisterListener(it) }
         val sm = getApplication<Application>()
