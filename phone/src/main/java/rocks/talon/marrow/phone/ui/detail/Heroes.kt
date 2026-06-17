@@ -1126,6 +1126,7 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
     val activeNetworkType by vm.activeNetworkType.collectAsState()
     val totalRxBytes by vm.totalRxBytes.collectAsState()
     val totalTxBytes by vm.totalTxBytes.collectAsState()
+    val networkRttMs by vm.networkRttMs.collectAsState()
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1256,6 +1257,18 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
                 val vpnColor = if (vpnOn) MaterialTheme.colorScheme.primary
                                else MaterialTheme.colorScheme.onSurface
                 BigStat("VPN", if (vpnOn) "Active" else "Off", valueColor = vpnColor)
+            }
+            // Network RTT — TCP connect latency to 8.8.8.8:53, no permissions needed, updated every ~10 s
+            val rtt = networkRttMs
+            if (rtt != null) {
+                Spacer(Modifier.height(8.dp))
+                val rttColor = when {
+                    rtt < 50  -> MaterialTheme.colorScheme.primary    // excellent
+                    rtt < 150 -> MaterialTheme.colorScheme.secondary   // good
+                    rtt < 300 -> MaterialTheme.colorScheme.onSurface   // fair
+                    else      -> MaterialTheme.colorScheme.error       // poor / high latency
+                }
+                BigStat("Ping", "$rtt ms", valueColor = rttColor)
             }
             // Network traffic totals since boot — shown when TrafficStats is available
             val rxBytes = totalRxBytes

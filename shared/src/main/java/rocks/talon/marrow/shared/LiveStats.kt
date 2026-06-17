@@ -1552,6 +1552,29 @@ object LiveStats {
         else          -> "normal"
     }
 
+    // -- Network RTT probe -------------------------------------------------------
+
+    /**
+     * Measures round-trip time to a well-known host via TCP connect.
+     *
+     * Opens a TCP connection to Google's public DNS server (8.8.8.8 port 53) and
+     * measures the time from [java.net.Socket.connect] to a successful socket
+     * establishment. No data is transferred — the socket is closed immediately.
+     * No permissions required.
+     *
+     * Returns elapsed milliseconds on success, or null on any failure (network
+     * unreachable, firewall block, or [timeoutMs] exceeded).
+     *
+     * @param timeoutMs Maximum wait time in milliseconds (default 1000 ms).
+     */
+    fun networkRttMs(timeoutMs: Int = 1000): Int? = runCatching {
+        val start = System.currentTimeMillis()
+        java.net.Socket().use { socket ->
+            socket.connect(java.net.InetSocketAddress("8.8.8.8", 53), timeoutMs)
+            (System.currentTimeMillis() - start).toInt()
+        }
+    }.getOrNull()
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =
