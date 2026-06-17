@@ -808,4 +808,32 @@ class LiveStatsTest {
         assertEquals("800dpi", LiveStats.displayDensityBucket(800))
     }
 
+
+
+    // ── storageUsedSeverity ────────────────────────────────────────────────────────
+
+    @Test fun storageUsedSeverity_0_is_normal() {
+        assertEquals("normal", LiveStats.storageUsedSeverity(0))
+    }
+
+    @Test fun storageUsedSeverity_74_is_normal() {
+        assertEquals("normal", LiveStats.storageUsedSeverity(74))
+    }
+
+    @Test fun storageUsedSeverity_75_is_warning() {
+        assertEquals("warning", LiveStats.storageUsedSeverity(75))
+    }
+
+    @Test fun storageUsedSeverity_89_is_warning() {
+        assertEquals("warning", LiveStats.storageUsedSeverity(89))
+    }
+
+    @Test fun storageUsedSeverity_90_is_critical() {
+        assertEquals("critical", LiveStats.storageUsedSeverity(90))
+    }
+
+    @Test fun storageUsedSeverity_100_is_critical() {
+        assertEquals("critical", LiveStats.storageUsedSeverity(100))
+    }
+
 }
