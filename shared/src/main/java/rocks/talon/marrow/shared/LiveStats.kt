@@ -380,6 +380,7 @@ object LiveStats {
         val usedBytes: Long get() = (totalBytes - availBytes).coerceAtLeast(0L)
         val usedFraction: Float
             get() = if (totalBytes > 0) (usedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f) else 0f
+        val usedPercent: Int get() = (usedFraction * 100f).toInt()
     }
 
     fun volumes(): List<Volume> {
