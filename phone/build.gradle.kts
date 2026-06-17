@@ -72,7 +72,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.core:core-splashscreen:1.0.1")
 
-    // Glance -- Jetpack Compose for home-screen widgets.
+    // Glance — Jetpack Compose for home-screen widgets.
     // glance-material3 dropped: GlanceTheme not exported cleanly from 1.1.0
     // with this Compose-BOM; using ColorProvider directly instead.
     implementation("androidx.glance:glance-appwidget:1.1.0")
