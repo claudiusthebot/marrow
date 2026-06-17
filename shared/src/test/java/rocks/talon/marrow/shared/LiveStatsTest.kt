@@ -704,4 +704,46 @@ class LiveStatsTest {
         assertNull(LiveStats.audioOutputLabel(listOf(99)))
     }
 
+    // ── batteryHealthLabel ─────────────────────────────────────────────────────────
+
+    @Test fun batteryHealthLabel_good() {
+        // BatteryManager.BATTERY_HEALTH_GOOD = 2
+        assertEquals("Good", LiveStats.batteryHealthLabel(2))
+    }
+
+    @Test fun batteryHealthLabel_overheat() {
+        // BatteryManager.BATTERY_HEALTH_OVERHEAT = 3
+        assertEquals("Overheat", LiveStats.batteryHealthLabel(3))
+    }
+
+    @Test fun batteryHealthLabel_dead() {
+        // BatteryManager.BATTERY_HEALTH_DEAD = 4
+        assertEquals("Dead", LiveStats.batteryHealthLabel(4))
+    }
+
+    @Test fun batteryHealthLabel_over_voltage() {
+        // BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE = 5
+        assertEquals("Over Voltage", LiveStats.batteryHealthLabel(5))
+    }
+
+    @Test fun batteryHealthLabel_unspecified_failure() {
+        // BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE = 6
+        assertEquals("Failure", LiveStats.batteryHealthLabel(6))
+    }
+
+    @Test fun batteryHealthLabel_cold() {
+        // BatteryManager.BATTERY_HEALTH_COLD = 7
+        assertEquals("Cold", LiveStats.batteryHealthLabel(7))
+    }
+
+    @Test fun batteryHealthLabel_unknown_returns_unknown_string() {
+        // BatteryManager.BATTERY_HEALTH_UNKNOWN = 1
+        assertEquals("Unknown", LiveStats.batteryHealthLabel(1))
+    }
+
+    @Test fun batteryHealthLabel_minus_one_returns_empty() {
+        // -1 = intent unavailable / no data → empty string (visibility guard)
+        assertEquals("", LiveStats.batteryHealthLabel(-1))
+    }
+
 }

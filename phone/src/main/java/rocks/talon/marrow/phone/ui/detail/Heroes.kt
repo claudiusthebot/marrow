@@ -185,6 +185,20 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                     }
                     BigStat("Health", "$healthPct%", valueColor = healthColor)
                 }
+                val healthStatus = battery?.healthStatus.orEmpty()
+                if (!isWatch && healthStatus.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    val conditionColor = when (healthStatus) {
+                        "Good"         -> Color(0xFF66BB6A)
+                        "Overheat",
+                        "Dead",
+                        "Over Voltage",
+                        "Failure"      -> MaterialTheme.colorScheme.error
+                        "Cold"         -> Color(0xFF42A5F5)
+                        else           -> MaterialTheme.colorScheme.onSurface
+                    }
+                    BigStat("Condition", healthStatus, valueColor = conditionColor)
+                }
                 val powerMw = battery?.powerMw ?: Int.MIN_VALUE
                 if (!isWatch && powerMw != Int.MIN_VALUE) {
                     Spacer(Modifier.height(8.dp))
