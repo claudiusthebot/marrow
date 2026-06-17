@@ -1420,6 +1420,7 @@ private fun degreesToCompassPoint(deg: Float): String {
 @Composable
 fun ActivityHero(vm: MarrowViewModel, section: Section) {
     val stepCount by vm.stepCount.collectAsState()
+    val stepCadence by vm.stepCadence.collectAsState()
     val compassBearingDeg by vm.compassBearingDeg.collectAsState()
     val gyroMagnitude by vm.gyroMagnitude.collectAsState()
     val linearAccelMagnitude by vm.linearAccelMagnitude.collectAsState()
@@ -1435,7 +1436,7 @@ fun ActivityHero(vm: MarrowViewModel, section: Section) {
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     )
                     Text(
-                        "Steps · heading · rotation · acceleration · since last reboot",
+                        "Steps · cadence · heading · rotation · acceleration · since last reboot",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1445,6 +1446,11 @@ fun ActivityHero(vm: MarrowViewModel, section: Section) {
             if (steps != null) {
                 Spacer(Modifier.height(12.dp))
                 BigStat("Steps", "%,d".format(steps))
+            }
+            val cadence = stepCadence
+            if (cadence != null) {
+                Spacer(Modifier.height(8.dp))
+                BigStat("Cadence", "$cadence steps/min")
             }
             val bearing = compassBearingDeg
             if (bearing != null) {
