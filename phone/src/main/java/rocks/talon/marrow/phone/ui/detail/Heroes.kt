@@ -1112,6 +1112,7 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
     val isBluetoothEnabled by vm.isBluetoothEnabled.collectAsState()
     val isHotspotEnabled by vm.isHotspotEnabled.collectAsState()
     val isVpnActive by vm.isVpnActive.collectAsState()
+    val activeNetworkType by vm.activeNetworkType.collectAsState()
     val totalRxBytes by vm.totalRxBytes.collectAsState()
     val totalTxBytes by vm.totalTxBytes.collectAsState()
     HeroBox {
@@ -1129,7 +1130,19 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
                     )
                 }
             }
-            wifiSsid?.let { ssid ->
+            // Active network type — live primary transport (Wi-Fi/Cellular/Ethernet/Bluetooth/None)
+            val netType = activeNetworkType
+            if (netType != null) {
+                Spacer(Modifier.height(8.dp))
+                val netTypeColor = when (netType) {
+                    "Wi-Fi", "Ethernet" -> MaterialTheme.colorScheme.primary
+                    "Cellular"          -> MaterialTheme.colorScheme.secondary
+                    "Bluetooth"         -> MaterialTheme.colorScheme.tertiary
+                    else                -> MaterialTheme.colorScheme.onSurface
+                }
+                BigStat("Active Network", netType, valueColor = netTypeColor)
+            }
+                        wifiSsid?.let { ssid ->
                 BigStat("Wi-Fi SSID", ssid)
             }
             val liveRssi = wifiRssiDbm
