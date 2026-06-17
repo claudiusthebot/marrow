@@ -1,4 +1,4 @@
-package rocks.talon.marrow.phone.ui.detail
+[Resource from github-tools at repo://claudiusthebot/marrow/sha/ea05d4049c8aade4c8a578772791ce8fd0de16c1/contents/phone/src/main/java/rocks/talon/marrow/phone/ui/detail/Heroes.kt] package rocks.talon.marrow.phone.ui.detail
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -731,6 +731,16 @@ fun MemoryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
             if (!isWatch && thresholdMb > 0L) {
                 Spacer(Modifier.height(16.dp))
                 BigStat("Kill Threshold", "$thresholdMb MB")
+            }
+            // Memory pressure BigStat — always shown on phone as a quick health indicator
+            if (!isWatch) {
+                Spacer(Modifier.height(16.dp))
+                val pressureLabel = when (pressure) {
+                    MemoryPressure.COMFORTABLE -> "OK"
+                    MemoryPressure.MODERATE    -> "Moderate"
+                    MemoryPressure.CRITICAL    -> "Low!"
+                }
+                BigStat("RAM State", pressureLabel, valueColor = pressure.color)
             }
         }
     }
