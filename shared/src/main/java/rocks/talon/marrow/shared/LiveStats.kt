@@ -1514,6 +1514,18 @@ object LiveStats {
         else              -> "${densityDpi}dpi"
     }
 
+
+    /**
+     * Maps storage [usedPct] (0–100) to a severity label used for colour-coding in StorageHero.
+     * Thresholds: normal < 75 % ≤ warning < 90 % ≤ critical.
+     * Zero permissions required — operates on data already collected by [volumes].
+     */
+    fun storageUsedSeverity(usedPct: Int): String = when {
+        usedPct >= 90 -> "critical"
+        usedPct >= 75 -> "warning"
+        else          -> "normal"
+    }
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =
