@@ -1090,6 +1090,12 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
             BigStat("DPI Class", densityBucket)
             Spacer(Modifier.height(4.dp))
             BigStat("Font Scale", "%.2f×".format(fontScaleVal))
+            Spacer(Modifier.height(4.dp))
+            BigStat(
+                "HDR",
+                if (hdr == "none") "None" else hdr,
+                valueColor = if (hdr != "none") MaterialTheme.colorScheme.tertiary else null,
+            )
         }
     }
 }
