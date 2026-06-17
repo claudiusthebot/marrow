@@ -746,4 +746,30 @@ class LiveStatsTest {
         assertEquals("", LiveStats.batteryHealthLabel(-1))
     }
 
+    // ── wifiSignalQuality ─────────────────────────────────────────────────────────
+
+    @Test fun wifiSignalQuality_at_minus50_is_excellent() {
+        assertEquals("Excellent", LiveStats.wifiSignalQuality(-50))
+    }
+
+    @Test fun wifiSignalQuality_above_minus50_is_excellent() {
+        assertEquals("Excellent", LiveStats.wifiSignalQuality(-30))
+        assertEquals("Excellent", LiveStats.wifiSignalQuality(-1))
+    }
+
+    @Test fun wifiSignalQuality_just_below_minus50_is_good() {
+        assertEquals("Good", LiveStats.wifiSignalQuality(-51))
+        assertEquals("Good", LiveStats.wifiSignalQuality(-65))
+    }
+
+    @Test fun wifiSignalQuality_just_below_minus65_is_fair() {
+        assertEquals("Fair", LiveStats.wifiSignalQuality(-66))
+        assertEquals("Fair", LiveStats.wifiSignalQuality(-80))
+    }
+
+    @Test fun wifiSignalQuality_below_minus80_is_poor() {
+        assertEquals("Poor", LiveStats.wifiSignalQuality(-81))
+        assertEquals("Poor", LiveStats.wifiSignalQuality(-120))
+    }
+
 }
