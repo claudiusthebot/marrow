@@ -965,6 +965,13 @@ private fun VolumeRow(vol: LiveStats.Volume) {
         ) {
             Box(modifier = Modifier.fillMaxWidth(animated).height(10.dp).background(MaterialTheme.colorScheme.primary))
         }
+        Spacer(Modifier.height(8.dp))
+        val usedColor = when (LiveStats.storageUsedSeverity(vol.usedPercent)) {
+            "critical" -> MaterialTheme.colorScheme.error
+            "warning"  -> MaterialTheme.colorScheme.tertiary
+            else       -> MaterialTheme.colorScheme.primary
+        }
+        BigStat("Used", "${vol.usedPercent}%", valueColor = usedColor)
     }
 }
 
