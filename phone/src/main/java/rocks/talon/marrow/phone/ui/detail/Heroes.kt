@@ -1855,15 +1855,71 @@ fun CellularHero(vm: MarrowViewModel, section: Section) {
 
 @Composable
 fun CamerasHero(section: Section) {
+    // Parse each camera's info from static section rows.
+    // Row label: "Camera N (facing)" — facing is "back", "front", or "external".
+    // Row value: "max W×H · sensor W×H · focal1mm, focal2mm"
+    val labelRegex = Regex("Camera \\d+ \\((\\w+)\\)")
+    val sensorRegex = Regex("(\\d+)×(\\d+)")
+
+    data class CamInfo(val facing: String, val mpStr: String, val focals: String)
+
+    val cameras = section.rows.mapNotNull { row ->
+        val facing = labelRegex.find(row.label)?.groupValues?.getOrNull(1) ?: return@mapNotNull null
+        val parts = row.value.split(" · ")
+        val sensorPart = parts.getOrNull(1)?.removePrefix("sensor")?.trim() ?: ""
+        val mpStr = sensorRegex.find(sensorPart)?.groupValues?.let { g ->
+            val w = g.getOrNull(1)?.toLongOrNull() ?: return@let null
+            val h = g.getOrNull(2)?.toLongOrNull() ?: return@let null
+            "%.1f MP".format(w * h / 1_000_000.0)
+        } ?: "?"
+        val focals = parts.getOrNull(2)?.trim()?.takeIf { it.isNotBlank() && it != "?" } ?: ""
+        CamInfo(facing, mpStr, focals)
+    }
+
+    val backCams  = cameras.filter { it.facing == "back" }
+    val frontCams = cameras.filter { it.facing == "front" }
+    val extCams   = cameras.filter { it.facing == "external" }
+
     HeroBox {
         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconBadge(icon = MarrowIcons.Cameras, size = 44, cornerRadius = 14)
                 Spacer(Modifier.width(12.dp))
-                Text(
-                    section.preview,
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                )
+                Column {
+                    Text(
+                        "Cameras",
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    )
+                    Text(
+                        section.preview,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            BigStat("Count", "${section.rows.size}")
+            val back = backCams.firstOrNull()
+            if (back != null) {
+                Spacer(Modifier.height(8.dp))
+                BigStat("Rear MP", back.mpStr)
+                if (back.focals.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    BigStat("Rear Focal", back.focals)
+                }
+            }
+            val front = frontCams.firstOrNull()
+            if (front != null) {
+                Spacer(Modifier.height(8.dp))
+                BigStat("Front MP", front.mpStr)
+                if (front.focals.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    BigStat("Front Focal", front.focals)
+                }
+            }
+            if (extCams.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                BigStat("External", "${extCams.size}")
             }
         }
     }
