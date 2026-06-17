@@ -380,6 +380,7 @@ object LiveStats {
         val usedBytes: Long get() = (totalBytes - availBytes).coerceAtLeast(0L)
         val usedFraction: Float
             get() = if (totalBytes > 0) (usedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f) else 0f
+        val usedPercent: Int get() = (usedFraction * 100f).toInt()
     }
 
     fun volumes(): List<Volume> {
@@ -1512,6 +1513,18 @@ object LiveStats {
         densityDpi <= 480 -> "xxhdpi"
         densityDpi <= 640 -> "xxxhdpi"
         else              -> "${densityDpi}dpi"
+    }
+
+
+    /**
+     * Maps storage [usedPct] (0–100) to a severity label used for colour-coding in StorageHero.
+     * Thresholds: normal < 75 % ≤ warning < 90 % ≤ critical.
+     * Zero permissions required — operates on data already collected by [volumes].
+     */
+    fun storageUsedSeverity(usedPct: Int): String = when {
+        usedPct >= 90 -> "critical"
+        usedPct >= 75 -> "warning"
+        else          -> "normal"
     }
 
     // -- helpers -----------------------------------------------------------------
