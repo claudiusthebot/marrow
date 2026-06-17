@@ -183,6 +183,15 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _isVpnActive = MutableStateFlow<Boolean?>(null)
     val isVpnActive: StateFlow<Boolean?> = _isVpnActive.asStateFlow()
 
+    /**
+     * Primary transport type of the active network: "Wi-Fi", "Ethernet", "Cellular",
+     * "Bluetooth", "None", or null when ConnectivityManager is unavailable.
+     * Updated each live-loop tick via [LiveStats.activeNetworkType].
+     * Zero permissions required (ACCESS_NETWORK_STATE already in manifest).
+     */
+    private val _activeNetworkType = MutableStateFlow<String?>(null)
+    val activeNetworkType: StateFlow<String?> = _activeNetworkType.asStateFlow()
+
     /** Cumulative bytes received across all interfaces since the last device reboot.
      *  Polled each live-loop tick from [LiveStats.totalRxBytes].
      *  null when [android.net.TrafficStats.UNSUPPORTED] is returned by the system. */
@@ -592,6 +601,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _isHotspotEnabled.value = LiveStats.isHotspotEnabled(ctx)
                 // VPN state — NetworkCapabilities.TRANSPORT_VPN, no extra permissions
                 _isVpnActive.value = LiveStats.isVpnActive(ctx)
+                // Active network type — ConnectivityManager transport, no extra permissions
+                _activeNetworkType.value = LiveStats.activeNetworkType(ctx)
                 // Network traffic totals since boot — TrafficStats, polled, no permissions needed
                 _totalRxBytes.value = LiveStats.totalRxBytes()
                 _totalTxBytes.value = LiveStats.totalTxBytes()
