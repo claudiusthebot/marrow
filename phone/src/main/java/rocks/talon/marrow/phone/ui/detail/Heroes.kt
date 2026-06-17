@@ -199,6 +199,11 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                     }
                     BigStat("Condition", healthStatus, valueColor = conditionColor)
                 }
+                val tech = battery?.technology.orEmpty()
+                if (!isWatch && tech.isNotEmpty() && tech != "?") {
+                    Spacer(Modifier.height(8.dp))
+                    BigStat("Technology", tech)
+                }
                 val powerMw = battery?.powerMw ?: Int.MIN_VALUE
                 if (!isWatch && powerMw != Int.MIN_VALUE) {
                     Spacer(Modifier.height(8.dp))
