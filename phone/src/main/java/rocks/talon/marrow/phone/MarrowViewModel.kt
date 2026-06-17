@@ -250,6 +250,14 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _stepCadence = MutableStateFlow<Int?>(null)
     val stepCadence: StateFlow<Int?> = _stepCadence.asStateFlow()
 
+    /**
+     * Steps accumulated since the app launched (session counter). Uses [Sensor.TYPE_STEP_DETECTOR]
+     * which fires one event per step; null when the sensor is unavailable on this device.
+     * Zero permissions required — TYPE_STEP_DETECTOR is readable by any app.
+     */
+    private val _sessionSteps = MutableStateFlow<Long?>(null)
+    val sessionSteps: StateFlow<Long?> = _sessionSteps.asStateFlow()
+
     /** Tracks previous step count + timestamp for cadence calculation across loop ticks. */
     private var _cadencePrevSteps: Long? = null
     private var _cadencePrevTimeMs: Long? = null
@@ -479,6 +487,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private var pressureSensorListener: SensorEventListener? = null
     private var ambientTempSensorListener: SensorEventListener? = null
     private var stepCounterListener: SensorEventListener? = null
+    private var stepDetectorListener: SensorEventListener? = null
     private var rotationVectorListener: SensorEventListener? = null
     private var gravitySensorListener: SensorEventListener? = null
     private var gyroscopeListener: SensorEventListener? = null
@@ -496,6 +505,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         startAmbientTempSensor()
         startRelativeHumiditySensor()
         startStepCounterSensor()
+        startStepDetectorSensor()
         startRotationVectorSensor()
         startGravitySensor()
         startGyroscopeSensor()
@@ -793,6 +803,33 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
+     * Registers a [SensorEventListener] for [Sensor.TYPE_STEP_DETECTOR] to count
+     * individual step events since app launch (session steps). Unlike [Sensor.TYPE_STEP_COUNTER]
+     * which accumulates monotonically since the last device reboot, TYPE_STEP_DETECTOR fires
+     * a single event per step with values[0] == 1.0f — so [_sessionSteps] increments by 1
+     * on each callback and resets to 0 when the app restarts.
+     *
+     * Uses [SensorManager.SENSOR_DELAY_NORMAL] (~200ms). The session counter starts at null
+     * (sensor not registered/unavailable) and is set to 0 on the first event. Thread-safe via
+     * [MutableStateFlow]. Zero permissions required. Silent no-op on devices without the sensor.
+     */
+    private fun startStepDetectorSensor() {
+        val sm = getApplication<Application>()
+            .getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR) ?: return
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                if (event == null) return
+                _sessionSteps.value = (_sessionSteps.value ?: 0L) + 1L
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        _sessionSteps.value = 0L          // sensor available — start session counter at 0
+        stepDetectorListener = listener
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
+    /**
      * Registers a [SensorEventListener] for [Sensor.TYPE_ROTATION_VECTOR] using
      * [SensorManager.SENSOR_DELAY_NORMAL] (~200ms). The rotation vector is a virtual /
      * composite sensor that fuses accelerometer + magnetometer + gyroscope data via
@@ -1018,6 +1055,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         pressureSensorListener?.let { sm?.unregisterListener(it) }
         ambientTempSensorListener?.let { sm?.unregisterListener(it) }
         stepCounterListener?.let { sm?.unregisterListener(it) }
+        stepDetectorListener?.let { sm?.unregisterListener(it) }
         rotationVectorListener?.let { sm?.unregisterListener(it) }
         gravitySensorListener?.let { sm?.unregisterListener(it) }
         gyroscopeListener?.let { sm?.unregisterListener(it) }
