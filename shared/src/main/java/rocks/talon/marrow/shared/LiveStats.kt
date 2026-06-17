@@ -39,6 +39,10 @@ object LiveStats {
         /** Battery wear level: charge_full / charge_full_design × 100.
          *  -1 when the sysfs nodes are absent or unreadable (emulator / OEM restriction). */
         val healthPercent: Int = -1,      // 0..100, -1 unknown
+        /** Human-readable health condition from BatteryManager.EXTRA_HEALTH.
+         *  E.g. "Good", "Overheat", "Dead", "Over Voltage", "Cold".
+         *  Empty string when healthInt is -1 / unknown. */
+        val healthStatus: String = "",
         /** Charge cycle count from sysfs. -1 when absent (emulator / OEM restriction). */
         val cycleCount: Int = -1,          // ≥0, -1 unknown
         /** Instantaneous charge from BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER converted
@@ -105,6 +109,7 @@ object LiveStats {
             technology = tech,
             healthy = healthInt == BatteryManager.BATTERY_HEALTH_GOOD || healthInt == -1,
             healthPercent = healthPct,
+            healthStatus = batteryHealthLabel(healthInt),
             cycleCount = readLong("/sys/class/power_supply/battery/cycle_count")
                 .let { if (it > 0L) it.toInt() else -1 },
             chargeCounterMah = chargeCounterMah(
@@ -131,6 +136,25 @@ object LiveStats {
         if (chargeFull <= 0 || chargeFullDesign <= 0) return -1
         return ((chargeFull.toFloat() / chargeFullDesign.toFloat()) * 100f)
             .roundToInt().coerceIn(0, 100)
+    }
+
+    /**
+     * Maps a [BatteryManager.EXTRA_HEALTH] integer to a human-readable condition string.
+     *
+     * Returns an empty string when [healthInt] is -1 (unknown / intent unavailable),
+     * so callers can use `healthStatus.isNotEmpty()` as the visibility guard.
+     *
+     * Exposed as a pure function for unit testability — no Android context needed.
+     */
+    fun batteryHealthLabel(healthInt: Int): String = when (healthInt) {
+        BatteryManager.BATTERY_HEALTH_GOOD               -> "Good"
+        BatteryManager.BATTERY_HEALTH_OVERHEAT           -> "Overheat"
+        BatteryManager.BATTERY_HEALTH_DEAD               -> "Dead"
+        BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE       -> "Over Voltage"
+        BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE -> "Failure"
+        BatteryManager.BATTERY_HEALTH_COLD               -> "Cold"
+        BatteryManager.BATTERY_HEALTH_UNKNOWN            -> "Unknown"
+        else                                              -> ""
     }
 
     /**
