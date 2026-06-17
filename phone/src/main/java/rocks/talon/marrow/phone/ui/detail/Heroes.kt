@@ -1127,6 +1127,15 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
                     else            -> MaterialTheme.colorScheme.error
                 }
                 BigStat("Wi-Fi Signal", "$liveRssi dBm", valueColor = rssiColor)
+                Spacer(Modifier.height(8.dp))
+                val quality = LiveStats.wifiSignalQuality(liveRssi)
+                val qualityColor = when (quality) {
+                    "Excellent" -> MaterialTheme.colorScheme.primary
+                    "Good"      -> MaterialTheme.colorScheme.secondary
+                    "Fair"      -> MaterialTheme.colorScheme.onSurface
+                    else        -> MaterialTheme.colorScheme.error // Poor
+                }
+                BigStat("Signal Quality", quality, valueColor = qualityColor)
             }
             val liveSpeed = wifiLinkSpeedMbps
             if (liveSpeed != null) {

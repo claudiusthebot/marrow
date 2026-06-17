@@ -1023,6 +1023,31 @@ object LiveStats {
         else                         -> null
     }
 
+    // -- Wi-Fi signal quality ---------------------------------------------------
+
+    /**
+     * Maps a Wi-Fi RSSI value in dBm to a user-facing signal quality label.
+     *
+     * Thresholds are derived from Android's own [WifiManager.calculateSignalLevel] tiers
+     * and common industry conventions:
+     *   ≥ −50 dBm → "Excellent"  (full bars, streaming / gaming reliable)
+     *   ≥ −65 dBm → "Good"       (typical home Wi-Fi, video calls fine)
+     *   ≥ −80 dBm → "Fair"       (usable, buffering may occur)
+     *    < −80 dBm → "Poor"       (weak signal, frequent drops)
+     *
+     * Extracted as a pure function so it can be unit-tested without an Android context.
+     * Callers use the already-polled [wifiRssi] value — no new permissions required.
+     *
+     * @param rssiDbm RSSI in dBm; valid range is typically −120..0. Values outside
+     *                this range still produce a label (clamped to "Poor" or "Excellent").
+     */
+    fun wifiSignalQuality(rssiDbm: Int): String = when {
+        rssiDbm >= -50 -> "Excellent"
+        rssiDbm >= -65 -> "Good"
+        rssiDbm >= -80 -> "Fair"
+        else           -> "Poor"
+    }
+
     // -- Audio output routing ----------------------------------------------------
 
     /**
