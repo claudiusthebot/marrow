@@ -1160,6 +1160,31 @@ object LiveStats {
         caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)
     }.getOrNull()
 
+    /**
+     * Returns the primary transport type of the active network as a human-readable label.
+     * Checks [android.net.NetworkCapabilities] transports in priority order:
+     * Wi-Fi → Ethernet → Cellular → Bluetooth → "None".
+     *
+     * Uses the same [android.net.ConnectivityManager] path as [isVpnActive].
+     * ACCESS_NETWORK_STATE is already declared in the manifest — no additional permissions required.
+     *
+     * Returns null when [android.net.ConnectivityManager] is unavailable.
+     * Returns "None" when there is no active network (airplane mode, etc.).
+     */
+    fun activeNetworkType(context: Context): String? = runCatching {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE)
+            as? android.net.ConnectivityManager ?: return@runCatching null
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+            ?: return@runCatching "None"
+        when {
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)     -> "Wi-Fi"
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> "Cellular"
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH)-> "Bluetooth"
+            else -> "Unknown"
+        }
+    }.getOrNull()
+
     // -- Network traffic totals -------------------------------------------------
 
     /**
