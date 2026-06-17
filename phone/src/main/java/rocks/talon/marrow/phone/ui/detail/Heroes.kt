@@ -732,6 +732,11 @@ fun MemoryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                 Spacer(Modifier.height(16.dp))
                 BigStat("Kill Threshold", "$thresholdMb MB")
             }
+            // RAM pressure level as BigStat — phone only (isWatch guard already applied to pressure)
+            if (!isWatch) {
+                Spacer(Modifier.height(16.dp))
+                BigStat("RAM State", pressure.label, valueColor = pressure.color)
+            }
         }
     }
 }
