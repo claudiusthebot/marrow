@@ -16,7 +16,7 @@ import org.junit.Test
  */
 class LiveStatsTest {
 
-    // ── cpuUsagePercent ────────────────────────────────────────────────────────
+    // ── cpuUsagePercent ────────────────────────────────────────────────────────────
 
     @Test fun cpuUsagePercent_normal_50_percent() {
         // 100 jiffies elapsed total, 50 of them idle → 50% busy.
@@ -57,7 +57,7 @@ class LiveStatsTest {
         assertEquals(0f, LiveStats.cpuUsagePercent(prev, curr), 0.001f)
     }
 
-    // ── networkRate ────────────────────────────────────────────────────────────
+    // ── networkRate ───────────────────────────────────────────────────────────
 
     @Test fun networkRate_one_second_one_kbyte() {
         val prev = LiveStats.NetworkSpeed(rxBytesTotal = 0L, txBytesTotal = 0L, timestampMs = 0L)
@@ -95,7 +95,7 @@ class LiveStatsTest {
         assertEquals(0L, tx)
     }
 
-    // ── diskRate ───────────────────────────────────────────────────────────────
+    // ── diskRate ────────────────────────────────────────────────────────────
 
     @Test fun diskRate_one_sector_one_second_is_512_bps() {
         // 1 sector = 512 B per /proc/diskstats convention.
@@ -133,7 +133,7 @@ class LiveStatsTest {
         assertEquals(0L, write)
     }
 
-    // ── formatSpeedBps ─────────────────────────────────────────────────────────
+    // ── formatSpeedBps ───────────────────────────────────────────────────────────
 
     @Test fun formatSpeedBps_below_1kb() {
         assertEquals("0 B/s", LiveStats.formatSpeedBps(0L))
@@ -153,7 +153,7 @@ class LiveStatsTest {
         assertEquals("12.3 MB/s", LiveStats.formatSpeedBps(12_345_678L))
     }
 
-    // ── formatDiskBps ──────────────────────────────────────────────────────────
+    // ── formatDiskBps ───────────────────────────────────────────────────────────
 
     @Test fun formatDiskBps_below_1kb() {
         assertEquals("0 B/s", LiveStats.formatDiskBps(0L))
@@ -216,7 +216,7 @@ class LiveStatsTest {
         assertEquals("0m", LiveStats.formatUptime(30L))
     }
 
-    // ── avgCurMhz ──────────────────────────────────────────────────────────────
+    // ── avgCurMhz ───────────────────────────────────────────────────────────
 
     @Test fun avgCurMhz_empty_returns_zero() {
         assertEquals(0L, LiveStats.avgCurMhz(emptyList()))
@@ -245,7 +245,7 @@ class LiveStatsTest {
         assertEquals(800L, LiveStats.avgCurMhz(cores))
     }
 
-    // ── storageUsedFraction ────────────────────────────────────────────────────
+    // ── storageUsedFraction ──────────────────────────────────────────────────────────
 
     @Test fun storageUsedFraction_empty_returns_zero() {
         assertEquals(0f, LiveStats.storageUsedFraction(emptyList()), 0.001f)
@@ -278,7 +278,7 @@ class LiveStatsTest {
         assertTrue("expected $frac in [0,1]", frac in 0f..1f)
     }
 
-    // ── Memory derived properties ──────────────────────────────────────────────
+    // ── Memory derived properties ────────────────────────────────────────────────────────
 
     @Test fun memory_used_bytes_basic() {
         val mem = LiveStats.Memory(totalBytes = 1000L, availBytes = 800L, thresholdBytes = 100L, lowMemory = false)
@@ -316,7 +316,7 @@ class LiveStatsTest {
         assertEquals(0.25f, mem.swapUsedFraction, 0.001f)
     }
 
-    // ── Volume derived properties ──────────────────────────────────────────────
+    // ── Volume derived properties ────────────────────────────────────────────────────────
 
     @Test fun volume_used_bytes_basic() {
         val vol = LiveStats.Volume("Internal", totalBytes = 1000L, availBytes = 600L)
@@ -338,7 +338,7 @@ class LiveStatsTest {
         assertEquals(0f, vol.usedFraction, 0.001f)
     }
 
-    // ── Gpu derived properties ─────────────────────────────────────────────────
+    // ── Gpu derived properties ────────────────────────────────────────────────────────
 
     @Test fun gpu_freq_fraction_half() {
         val gpu = LiveStats.Gpu(curMhz = 500L, minMhz = 200L, maxMhz = 1000L, governor = "msm-adreno-tz", usagePercent = 50)
@@ -371,7 +371,7 @@ class LiveStatsTest {
         assertFalse(gpu.available)
     }
 
-    // ── batteryHealthPercent ───────────────────────────────────────────────────
+    // ── batteryHealthPercent ────────────────────────────────────────────────────────
 
     @Test fun batteryHealthPercent_normal_wear_90_percent() {
         // 4500 µAh actual vs 5000 µAh design → 90% health.
@@ -408,7 +408,7 @@ class LiveStatsTest {
         assertEquals(-1, LiveStats.batteryHealthPercent(0L, 0L))
     }
 
-    // ── powerMw ────────────────────────────────────────────────────────────────
+    // ── powerMw ────────────────────────────────────────────────────────────
 
     private fun makeBattery(
         voltageV: Float = 3.85f,
@@ -450,7 +450,7 @@ class LiveStatsTest {
         assertEquals(0, b.powerMw)
     }
 
-    // ── formatScreenTimeout ────────────────────────────────────────────────────
+    // ── formatScreenTimeout ────────────────────────────────────────────────────────
 
     @Test fun formatScreenTimeout_seconds() {
         assertEquals("30s", LiveStats.formatScreenTimeout(30_000))
@@ -480,7 +480,7 @@ class LiveStatsTest {
         assertEquals("1h 30m", LiveStats.formatScreenTimeout(5_400_000))
     }
 
-    // ── deepSleepFractionPct ───────────────────────────────────────────────────
+    // ── deepSleepFractionPct ────────────────────────────────────────────────────────
 
     @Test fun deepSleepFractionPct_no_sleep() {
         // elapsed == uptime → device never slept → 0%
@@ -502,7 +502,7 @@ class LiveStatsTest {
         assertEquals(-1, LiveStats.deepSleepFractionPct(0L, 0L))
     }
 
-    // ── thermalStatusLabel ────────────────────────────────────────────────────
+    // ── thermalStatusLabel ────────────────────────────────────────────────────────
 
     @Test fun thermalStatusLabel_none() {
         assertEquals("None", LiveStats.thermalStatusLabel(0))
@@ -536,6 +536,7 @@ class LiveStatsTest {
         // Any undocumented status code should be gracefully labelled
         assertEquals("Unknown", LiveStats.thermalStatusLabel(99))
     }
+
     // -- chargeCounterMah ----------------------------------------------------
 
     @Test fun chargeCounterMah_typical_4000mah() {
@@ -573,7 +574,7 @@ class LiveStatsTest {
         assertEquals(0, LiveStats.chargeCounterMah(999))
     }
 
-    // ── Memory.thresholdBytes — kill threshold MB display ──────────────────────
+    // ── Memory.thresholdBytes — kill threshold MB display ──────────────────────────
 
     @Test fun memory_threshold_mb_typical() {
         // 256 MB threshold (common on phones with ~4–6 GB RAM)
@@ -612,7 +613,7 @@ class LiveStatsTest {
         assertEquals(300L, thresholdMb)
     }
 
-    // ── wifiChannelFromMhz ────────────────────────────────────────────────────
+    // ── wifiChannelFromMhz ──────────────────────────────────────────────────────────
 
     @Test fun wifiChannelFromMhz_24ghz_channel1() {
         // 2412 MHz = 2.4 GHz channel 1 (first standard 2.4 GHz channel)
@@ -649,6 +650,58 @@ class LiveStatsTest {
         assertNull(LiveStats.wifiChannelFromMhz(0))
         assertNull(LiveStats.wifiChannelFromMhz(3000))
         assertNull(LiveStats.wifiChannelFromMhz(9999))
+    }
+
+    // ── audioOutputLabel ────────────────────────────────────────────────────────────
+
+    @Test fun audioOutputLabel_bluetooth_a2dp() {
+        // TYPE_BLUETOOTH_A2DP=13 → "Bluetooth"
+        assertEquals("Bluetooth", LiveStats.audioOutputLabel(listOf(13)))
+    }
+
+    @Test fun audioOutputLabel_bluetooth_ble_headset() {
+        // TYPE_BLE_HEADSET=26 → "Bluetooth"
+        assertEquals("Bluetooth", LiveStats.audioOutputLabel(listOf(26)))
+    }
+
+    @Test fun audioOutputLabel_bluetooth_sco() {
+        // TYPE_BLUETOOTH_SCO=7 → "Bluetooth" (used for calls)
+        assertEquals("Bluetooth", LiveStats.audioOutputLabel(listOf(7)))
+    }
+
+    @Test fun audioOutputLabel_wired_headphones() {
+        // TYPE_WIRED_HEADPHONES=8 → "Wired"
+        assertEquals("Wired", LiveStats.audioOutputLabel(listOf(8)))
+    }
+
+    @Test fun audioOutputLabel_wired_headset() {
+        // TYPE_WIRED_HEADSET=3 → "Wired"
+        assertEquals("Wired", LiveStats.audioOutputLabel(listOf(3)))
+    }
+
+    @Test fun audioOutputLabel_speaker() {
+        // TYPE_BUILTIN_SPEAKER=2 → "Speaker"
+        assertEquals("Speaker", LiveStats.audioOutputLabel(listOf(2)))
+    }
+
+    @Test fun audioOutputLabel_earpiece() {
+        // TYPE_BUILTIN_EARPIECE=1 → "Earpiece"
+        assertEquals("Earpiece", LiveStats.audioOutputLabel(listOf(1)))
+    }
+
+    @Test fun audioOutputLabel_bluetooth_wins_over_wired() {
+        // Bluetooth takes priority over wired when both present
+        assertEquals("Bluetooth", LiveStats.audioOutputLabel(listOf(13, 8)))
+    }
+
+    @Test fun audioOutputLabel_empty_list_returns_null() {
+        // No output devices → null
+        assertNull(LiveStats.audioOutputLabel(emptyList()))
+    }
+
+    @Test fun audioOutputLabel_unknown_type_returns_null() {
+        // Unknown/unrecognised device type → null (no match)
+        assertNull(LiveStats.audioOutputLabel(listOf(99)))
     }
 
 }

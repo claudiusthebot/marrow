@@ -999,6 +999,49 @@ object LiveStats {
         else                         -> null
     }
 
+    // -- Audio output routing ----------------------------------------------------
+
+    /**
+     * Maps a list of [android.media.AudioDeviceInfo] TYPE_ integer constants to a user-facing
+     * audio output route label. Extracted as a pure function so it can be unit-tested without
+     * an Android context.
+     *
+     * Priority order: Bluetooth > Wired > Earpiece > Speaker.
+     *
+     * Type constant values (android.media.AudioDeviceInfo):
+     *   Bluetooth: TYPE_BLUETOOTH_SCO=7, TYPE_BLUETOOTH_A2DP=13, TYPE_BLE_HEADSET=26, TYPE_BLE_SPEAKER=27
+     *   Wired:     TYPE_WIRED_HEADSET=3, TYPE_WIRED_HEADPHONES=8, TYPE_USB_HEADSET=23
+     *   Earpiece:  TYPE_BUILTIN_EARPIECE=1
+     *   Speaker:   TYPE_BUILTIN_SPEAKER=2
+     */
+    internal fun audioOutputLabel(types: List<Int>): String? {
+        if (types.isEmpty()) return null
+        return when {
+            types.any { it in listOf(7, 13, 26, 27) } -> "Bluetooth"
+            types.any { it in listOf(3, 8, 23) }       -> "Wired"
+            types.any { it == 1 }                      -> "Earpiece"
+            types.any { it == 2 }                      -> "Speaker"
+            else                                       -> null
+        }
+    }
+
+    /**
+     * Current audio output route as a user-facing label: "Bluetooth", "Wired", "Earpiece",
+     * or "Speaker". Returns null when [android.media.AudioManager] is unavailable or no
+     * known outputs are active.
+     *
+     * Reads [android.media.AudioManager.getDevices] with [android.media.AudioManager.GET_DEVICES_OUTPUTS]
+     * — zero permissions required (available API 23+, minSdk=30).
+     *
+     * Phone only. Zero permissions required.
+     */
+    fun audioOutputRoute(context: Context): String? = runCatching {
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            ?: return@runCatching null
+        val types = am.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS).map { it.type }
+        audioOutputLabel(types)
+    }.getOrNull()
+
     // -- Connectivity toggles ----------------------------------------------------
 
     /**
