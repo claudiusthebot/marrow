@@ -979,6 +979,25 @@ object LiveStats {
         thermalStatusLabel(pm.currentThermalStatus)
     }.getOrNull()
 
+    /**
+     * Maps a Wi-Fi frequency in MHz to an 802.11 channel number, or null when the
+     * frequency is not within a known Wi-Fi band.
+     *
+     * Extracted as a pure function so it can be unit-tested without an Android context.
+     * No new data reads or permissions — callers use the already-polled [wifiFrequencyMhz].
+     *
+     * Band→channel mapping:
+     *   2.4 GHz: channels 1–13 at 2412–2472 MHz (Δ5 MHz each), channel 14 at 2484 MHz
+     *   5 GHz:   channels 36–165 at 5180–5825 MHz (Δ5 MHz each, (freq-5000)/5)
+     *   6 GHz:   channels 1–93 at 5955–7115 MHz (Δ20 MHz spacing, (freq-5950)/5)
+     */
+    fun wifiChannelFromMhz(freqMhz: Int): Int? = when {
+        freqMhz == 2484              -> 14                      // 2.4 GHz ch14 (Japan)
+        freqMhz in 2412..2472        -> (freqMhz - 2407) / 5   // 2.4 GHz ch1–ch13
+        freqMhz in 5180..5825        -> (freqMhz - 5000) / 5   // 5 GHz ch36–ch165
+        freqMhz in 5955..7115        -> (freqMhz - 5950) / 5   // 6 GHz ch1–ch93
+        else                         -> null
+    }
 
     // -- Connectivity toggles ----------------------------------------------------
 
