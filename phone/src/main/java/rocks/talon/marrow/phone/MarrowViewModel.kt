@@ -242,6 +242,19 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     val stepCount: StateFlow<Long?> = _stepCount.asStateFlow()
 
     /**
+     * Live step cadence in steps/minute, derived from [_stepCount] deltas measured across
+     * consecutive live-loop ticks. null until two step-counter readings are available.
+     * Updated each loop iteration — cadence reflects the rate over the last polling interval.
+     * Zero permissions required (uses the same TYPE_STEP_COUNTER sensor as [stepCount]).
+     */
+    private val _stepCadence = MutableStateFlow<Int?>(null)
+    val stepCadence: StateFlow<Int?> = _stepCadence.asStateFlow()
+
+    /** Tracks previous step count + timestamp for cadence calculation across loop ticks. */
+    private var _cadencePrevSteps: Long? = null
+    private var _cadencePrevTimeMs: Long? = null
+
+    /**
      * Current screen refresh rate in Hz from [android.view.Display.getRefreshRate].
      * null in non-UI contexts or when [Context.getDisplay] returns null (service env).
      * On LTPO / VRR displays (Pixel 8 Pro, Samsung Galaxy S24 Ultra) this adapts
@@ -603,6 +616,22 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _isVpnActive.value = LiveStats.isVpnActive(ctx)
                 // Active network type — ConnectivityManager transport, no extra permissions
                 _activeNetworkType.value = LiveStats.activeNetworkType(ctx)
+                // Step cadence — delta of TYPE_STEP_COUNTER across loop ticks, no permissions needed
+                val currentSteps = _stepCount.value
+                val prevSteps = _cadencePrevSteps
+                val prevTimeMs = _cadencePrevTimeMs
+                val nowMs = System.currentTimeMillis()
+                if (currentSteps != null && prevSteps != null && prevTimeMs != null) {
+                    val deltaSteps = currentSteps - prevSteps
+                    val deltaMs = nowMs - prevTimeMs
+                    if (deltaMs > 0 && deltaSteps >= 0) {
+                        _stepCadence.value = ((deltaSteps.toDouble() / deltaMs) * 60_000).toInt()
+                    }
+                }
+                if (currentSteps != null) {
+                    _cadencePrevSteps = currentSteps
+                    _cadencePrevTimeMs = nowMs
+                }
                 // Network traffic totals since boot — TrafficStats, polled, no permissions needed
                 _totalRxBytes.value = LiveStats.totalRxBytes()
                 _totalTxBytes.value = LiveStats.totalTxBytes()
