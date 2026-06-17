@@ -772,4 +772,40 @@ class LiveStatsTest {
         assertEquals("Poor", LiveStats.wifiSignalQuality(-120))
     }
 
+
+    // ── displayDensityBucket ──────────────────────────────────────────────────────
+
+    @Test fun displayDensityBucket_120_is_ldpi() {
+        assertEquals("ldpi", LiveStats.displayDensityBucket(120))
+    }
+
+    @Test fun displayDensityBucket_160_is_mdpi() {
+        assertEquals("mdpi", LiveStats.displayDensityBucket(160))
+    }
+
+    @Test fun displayDensityBucket_240_is_hdpi() {
+        assertEquals("hdpi", LiveStats.displayDensityBucket(240))
+    }
+
+    @Test fun displayDensityBucket_320_is_xhdpi() {
+        assertEquals("xhdpi", LiveStats.displayDensityBucket(320))
+    }
+
+    @Test fun displayDensityBucket_480_is_xxhdpi() {
+        assertEquals("xxhdpi", LiveStats.displayDensityBucket(480))
+    }
+
+    @Test fun displayDensityBucket_560_is_xxxhdpi() {
+        // 560 dpi — common Pixel display; above 480 but below 640 → xxxhdpi bucket
+        assertEquals("xxxhdpi", LiveStats.displayDensityBucket(560))
+    }
+
+    @Test fun displayDensityBucket_640_is_xxxhdpi() {
+        assertEquals("xxxhdpi", LiveStats.displayDensityBucket(640))
+    }
+
+    @Test fun displayDensityBucket_above_640_returns_raw_dpi() {
+        assertEquals("800dpi", LiveStats.displayDensityBucket(800))
+    }
+
 }

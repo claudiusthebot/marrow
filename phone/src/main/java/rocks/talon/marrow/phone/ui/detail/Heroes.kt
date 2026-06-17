@@ -985,6 +985,7 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
         "${dm.widthPixels}×${dm.heightPixels}"
     }
     val densityDpiVal = remember { ctx.resources.displayMetrics.densityDpi }
+    val densityBucket = remember { LiveStats.displayDensityBucket(ctx.resources.displayMetrics.densityDpi) }
     val fontScaleVal = LocalConfiguration.current.fontScale
     val res = section.rows.firstOrNull { it.label == "Resolution" }?.value ?: "—"
     val dpi = section.rows.firstOrNull { it.label == "Density" }?.value ?: "—"
@@ -1073,6 +1074,8 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
             BigStat("Resolution", resolutionStr)
             Spacer(Modifier.height(4.dp))
             BigStat("PPI", "$densityDpiVal dpi")
+            Spacer(Modifier.height(4.dp))
+            BigStat("DPI Class", densityBucket)
             Spacer(Modifier.height(4.dp))
             BigStat("Font Scale", "%.2f×".format(fontScaleVal))
         }

@@ -1494,6 +1494,26 @@ object LiveStats {
         }
     }.getOrNull()
 
+
+    /**
+     * Maps [densityDpi] (from [android.util.DisplayMetrics.densityDpi]) to the Android screen
+     * density bucket string (ldpi / mdpi / hdpi / xhdpi / xxhdpi / xxxhdpi).  Values between
+     * standard thresholds are rounded to the nearest bucket — the same way the Android resource
+     * system resolves drawable qualifiers.
+     *
+     * DisplayHero passes [android.content.res.Resources.displayMetrics.densityDpi] directly.
+     * Zero permissions required.
+     */
+    fun displayDensityBucket(densityDpi: Int): String = when {
+        densityDpi <= 120 -> "ldpi"
+        densityDpi <= 160 -> "mdpi"
+        densityDpi <= 240 -> "hdpi"
+        densityDpi <= 320 -> "xhdpi"
+        densityDpi <= 480 -> "xxhdpi"
+        densityDpi <= 640 -> "xxxhdpi"
+        else              -> "${densityDpi}dpi"
+    }
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =

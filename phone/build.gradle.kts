@@ -13,8 +13,8 @@ android {
         applicationId = "rocks.talon.marrow"
         minSdk = 30
         targetSdk = 36
-        versionCode = 80
-        versionName = "0.80.0"
+        versionCode = 81
+        versionName = "0.81.0"
     }
 
     buildTypes {
@@ -77,11 +77,11 @@ dependencies {
     // with this Compose-BOM; using ColorProvider directly instead.
     implementation("androidx.glance:glance-appwidget:1.1.0")
 
-    // Squircle shapes — smooth superellipse corners matching PixelPlayer's visual language.
+    // Squircle shapes -- smooth superellipse corners matching PixelPlayer visual language.
     // AbsoluteSmoothCornerShape(28.dp, 60) for capability cards;
     // (18.dp, 60) for info/hero metric tiles; (32.dp, 60) for the hero banner.
     // Inlined in phone/src/main/java/.../ui/components/SmoothCornerShape.kt
-    // (io.github.racra:smooth-corner-rect-library:1.0.4 removed — not on any public Maven repo)
+    // (io.github.racra:smooth-corner-rect-library:1.0.4 removed -- not on any public Maven repo)
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 
