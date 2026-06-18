@@ -836,4 +836,46 @@ class LiveStatsTest {
         assertEquals("critical", LiveStats.storageUsedSeverity(100))
     }
 
+    // ── lightLevelCategory ─────────────────────────────────────────────────────
+
+    @Test fun lightLevelCategory_zero_is_dark() {
+        assertEquals("Dark", LiveStats.lightLevelCategory(0f))
+    }
+
+    @Test fun lightLevelCategory_below_1_is_dark() {
+        assertEquals("Dark", LiveStats.lightLevelCategory(0.5f))
+    }
+
+    @Test fun lightLevelCategory_at_1_is_dim() {
+        assertEquals("Dim", LiveStats.lightLevelCategory(1f))
+    }
+
+    @Test fun lightLevelCategory_at_9_is_dim() {
+        assertEquals("Dim", LiveStats.lightLevelCategory(9f))
+    }
+
+    @Test fun lightLevelCategory_at_10_is_indoor() {
+        assertEquals("Indoor", LiveStats.lightLevelCategory(10f))
+    }
+
+    @Test fun lightLevelCategory_at_199_is_indoor() {
+        assertEquals("Indoor", LiveStats.lightLevelCategory(199f))
+    }
+
+    @Test fun lightLevelCategory_at_200_is_bright() {
+        assertEquals("Bright", LiveStats.lightLevelCategory(200f))
+    }
+
+    @Test fun lightLevelCategory_at_999_is_bright() {
+        assertEquals("Bright", LiveStats.lightLevelCategory(999f))
+    }
+
+    @Test fun lightLevelCategory_at_1000_is_outdoor() {
+        assertEquals("Outdoor", LiveStats.lightLevelCategory(1000f))
+    }
+
+    @Test fun lightLevelCategory_large_value_is_outdoor() {
+        assertEquals("Outdoor", LiveStats.lightLevelCategory(50000f))
+    }
+
 }
