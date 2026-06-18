@@ -277,6 +277,7 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
         ?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
     val governor = cores.firstOrNull { it.governor != null }?.governor
     val peakFreqMhz = cores.filter { it.curMhz > 0 }.maxOfOrNull { it.curMhz }
+    val minFreqMhz = cores.filter { it.minMhz > 0 }.minOfOrNull { it.minMhz }
 
     // Temperature color: mirrors BatteryHero tint thresholds.
     // Green  < 60 °C — normal operating range.
@@ -412,6 +413,10 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
             if (!isWatch && peakFreqMhz != null) {
                 Spacer(Modifier.height(16.dp))
                 BigStat("Peak Freq", "%.1f GHz".format(peakFreqMhz / 1000f))
+            }
+            if (!isWatch && minFreqMhz != null) {
+                Spacer(Modifier.height(16.dp))
+                BigStat("Min Freq", "%.1f GHz".format(minFreqMhz / 1000f))
             }
             if (abis.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
@@ -1061,6 +1066,16 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
             if (lux != null) {
                 Spacer(Modifier.height(4.dp))
                 BigStat("Ambient", "${lux.roundToInt()} lux")
+                Spacer(Modifier.height(4.dp))
+                val lightCategory = LiveStats.lightLevelCategory(lux)
+                val lightColor = when (lightCategory) {
+                    "Outdoor" -> MaterialTheme.colorScheme.primary
+                    "Bright"  -> MaterialTheme.colorScheme.secondary
+                    "Indoor"  -> MaterialTheme.colorScheme.tertiary
+                    "Dim"     -> MaterialTheme.colorScheme.onSurfaceVariant
+                    else      -> MaterialTheme.colorScheme.onSurface // Dark
+                }
+                BigStat("Light Level", lightCategory, valueColor = lightColor)
             }
             val rateHz = screenRefreshRateHz
             if (rateHz != null) {

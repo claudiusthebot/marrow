@@ -1552,6 +1552,31 @@ object LiveStats {
         else          -> "normal"
     }
 
+    // -- Ambient light level category -------------------------------------------
+
+    /**
+     * Maps a raw ambient-light reading in lux to a human-readable illuminance
+     * category. Useful as a companion label alongside the raw lux [BigStat].
+     *
+     * Reference scale (approximate):
+     *   - Starlight / moonless night : ~0.001 lux
+     *   - Moonlight                  : ~1 lux
+     *   - Living room                : 50–200 lux
+     *   - Office desk                : 300–500 lux
+     *   - Overcast outdoor           : ~1 000 lux
+     *   - Full sunlight              : 10 000–100 000 lux
+     *
+     * @param lux Sensor reading from [android.hardware.Sensor.TYPE_LIGHT].
+     * @return One of "Dark", "Dim", "Indoor", "Bright", or "Outdoor".
+     */
+    fun lightLevelCategory(lux: Float): String = when {
+        lux < 1f    -> "Dark"
+        lux < 10f   -> "Dim"
+        lux < 200f  -> "Indoor"
+        lux < 1000f -> "Bright"
+        else        -> "Outdoor"
+    }
+
     // -- Network RTT probe -------------------------------------------------------
 
     /**
