@@ -2,6 +2,7 @@ package rocks.talon.marrow.phone
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import rocks.talon.marrow.phone.notification.MarrowNotificationService
 import rocks.talon.marrow.phone.prefs.Settings
 import rocks.talon.marrow.phone.prefs.SettingsRepository
 import rocks.talon.marrow.phone.prefs.ThemeMode
@@ -559,6 +561,14 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setRefreshInterval(seconds: Int) {
         viewModelScope.launch { settingsRepo.setRefreshIntervalSeconds(seconds) }
+    }
+
+    fun setLiveNotificationEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.setLiveNotificationEnabled(enabled) }
+        val ctx = getApplication<Application>()
+        val action = if (enabled) MarrowNotificationService.ACTION_START else MarrowNotificationService.ACTION_STOP
+        val intent = Intent(ctx, MarrowNotificationService::class.java).setAction(action)
+        if (enabled) ctx.startForegroundService(intent) else ctx.startService(intent)
     }
 
     // -- Live loop ---------------------------------------------------------------
