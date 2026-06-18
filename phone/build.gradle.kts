@@ -13,8 +13,8 @@ android {
         applicationId = "rocks.talon.marrow"
         minSdk = 30
         targetSdk = 36
-        versionCode = 92
-        versionName = "0.92.0"
+        versionCode = 93
+        versionName = "0.93.0"
     }
 
     buildTypes {
