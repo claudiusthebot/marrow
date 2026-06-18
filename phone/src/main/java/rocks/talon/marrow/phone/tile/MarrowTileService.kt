@@ -1,5 +1,6 @@
 package rocks.talon.marrow.phone.tile
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
@@ -24,6 +25,7 @@ class MarrowTileService : TileService() {
         updateTile()
     }
 
+    @SuppressLint("StartActivityAndCollapseDeprecated")
     override fun onClick() {
         super.onClick()
         val intent = Intent(this, MainActivity::class.java)
