@@ -14,6 +14,13 @@
          Grants dataNetworkType + signalStrength. Degrades gracefully on API < 33. -->
     <uses-permission android:name="android.permission.READ_BASIC_PHONE_STATE" />
 
+    <!-- Foreground service — normal permission (no runtime dialog). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- API 34+ type declaration for the live-stats notification service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- API 33+ — show notifications; user must grant in app settings if not auto-approved. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <queries>
         <package android:name="com.google.android.wearable.app" />
     </queries>
@@ -65,6 +72,13 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+
+        <!-- Ambient live-stats foreground service (optional, user opt-in). -->
+        <!-- Start: send ACTION_START Intent; Stop: send ACTION_STOP Intent. -->
+        <service
+            android:name=".notification.MarrowNotificationService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- Home-screen widget (Jetpack Glance). -->
         <receiver
