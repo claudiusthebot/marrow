@@ -20,6 +20,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- API 33+ — show notifications; user must grant in app settings if not auto-approved. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Normal permission — auto-restart live-stats service after device reboot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <queries>
         <package android:name="com.google.android.wearable.app" />
@@ -90,6 +92,16 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/marrow_widget_info" />
+        </receiver>
+
+        <!-- Restores the live-stats notification service on reboot if the user had it enabled. -->
+        <receiver
+            android:name=".notification.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
         </receiver>
 
     </application>
