@@ -1083,9 +1083,7 @@ fun DisplayHero(vm: MarrowViewModel, section: Section) {
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    res.replace(" px", "").replace(" × ", "
-×
-"),
+                    res.replace(" px", "").replace(" × ", "\n×\n"),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -1960,8 +1958,8 @@ fun CamerasHero(section: Section) {
     // Parse each camera's info from static section rows.
     // Row label: "Camera N (facing)" — facing is "back", "front", or "external".
     // Row value: "max W×H · sensor W×H · focal1mm, focal2mm"
-    val labelRegex = Regex("Camera \d+ \((\w+)\)")
-    val sensorRegex = Regex("(\d+)×(\d+)")
+    val labelRegex = Regex("Camera \\d+ \\((\\w+)\\)")
+    val sensorRegex = Regex("(\\d+)×(\\d+)")
 
     data class CamInfo(val facing: String, val mpStr: String, val focals: String)
 
