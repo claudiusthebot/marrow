@@ -109,6 +109,14 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     val thermalZones: StateFlow<List<LiveStats.ThermalZone>> = _thermalZones.asStateFlow()
 
     /**
+     * System load averages from /proc/loadavg as (1-min, 5-min, 15-min).
+     * null until the first live-loop tick, or on restricted environments where
+     * /proc/loadavg is inaccessible (unusual on Android — the file is world-readable).
+     */
+    private val _systemLoadAvg = MutableStateFlow<Triple<Float, Float, Float>?>(null)
+    val systemLoadAvg: StateFlow<Triple<Float, Float, Float>?> = _systemLoadAvg.asStateFlow()
+
+    /**
      * Live GPU stats — current frequency, min/max, governor, and utilisation.
      * null until the first live-loop tick.
      * [LiveStats.Gpu.available] is false on emulators or devices where the GPU
@@ -608,6 +616,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 prevCpuStat = cpuStat
                 // Thermal zones — all accessible zones ≥ 25 °C, sorted hottest-first
                 _thermalZones.value = LiveStats.thermalZones()
+                // System load averages — /proc/loadavg, world-readable, no permissions needed
+                _systemLoadAvg.value = LiveStats.systemLoadAvg()
                 // GPU — frequency, utilisation, governor (kgsl or generic devfreq)
                 _gpu.value = LiveStats.gpu()
                 // Wi-Fi RSSI — live signal strength in dBm (null when not on Wi-Fi)

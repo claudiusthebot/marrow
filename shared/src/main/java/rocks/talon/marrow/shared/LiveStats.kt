@@ -1600,6 +1600,40 @@ object LiveStats {
         }
     }.getOrNull()
 
+    /**
+     * Parses a single line from /proc/loadavg and returns the 1-min, 5-min, and 15-min
+     * load averages as a Triple. Returns null if the line is malformed.
+     *
+     * /proc/loadavg format: "1.23 4.56 7.89 12/345 6789"
+     *  - Fields 0–2: exponentially weighted moving averages over 1, 5, and 15 minutes.
+     *  - Field 3:    running/total runnable entities (e.g. "3/512").
+     *  - Field 4:    most recently created PID.
+     *
+     * Only the first three whitespace-separated tokens are consumed.
+     */
+    internal fun parseLoadAvg(line: String): Triple<Float, Float, Float>? {
+        val parts = line.trim().split(Regex("\\s+"))
+        if (parts.size < 3) return null
+        val avg1 = parts[0].toFloatOrNull() ?: return null
+        val avg5 = parts[1].toFloatOrNull() ?: return null
+        val avg15 = parts[2].toFloatOrNull() ?: return null
+        return Triple(avg1, avg5, avg15)
+    }
+
+    /**
+     * Returns the 1-minute, 5-minute, and 15-minute system load averages from
+     * /proc/loadavg as a Triple, or null if the file is unreadable.
+     *
+     * Load average represents the average number of runnable + uninterruptible
+     * processes over each interval. A value equal to the CPU core count means
+     * fully loaded; above it means overloaded.
+     *
+     * No permissions required — /proc/loadavg is world-readable on Android.
+     */
+    fun systemLoadAvg(): Triple<Float, Float, Float>? = runCatching {
+        parseLoadAvg(File("/proc/loadavg").readText())
+    }.getOrNull()
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =
