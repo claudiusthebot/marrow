@@ -166,6 +166,19 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _txHistory = MutableStateFlow<List<Float>>(emptyList())
     val txHistory: StateFlow<List<Float>> = _txHistory.asStateFlow()
 
+    /** Backing circular buffer for [batteryCurrentHistory]. Retains the last 60 current-mA samples. */
+    private val _batteryCurrentHistoryBuffer = HistoryBuffer(capacity = 60)
+
+    /**
+     * Rolling history of battery current draw in mA (newest last).
+     * Positive = discharging, negative = charging (convention varies by OEM).
+     * Updated each live-loop tick after [_battery] is computed.
+     * Empty until the first battery reading is available.
+     * Phone only — not pushed on watch.
+     */
+    private val _batteryCurrentHistory = MutableStateFlow<List<Float>>(emptyList())
+    val batteryCurrentHistory: StateFlow<List<Float>> = _batteryCurrentHistory.asStateFlow()
+
     /**
      * Live GPU stats — current frequency, min/max, governor, and utilisation.
      * null until the first live-loop tick.
@@ -637,6 +650,14 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
             while (true) {
                 val ctx = getApplication<Application>()
                 _battery.value = LiveStats.battery(ctx)
+                // Battery current history — push mA reading each tick for sparkline
+                _battery.value?.let { bat ->
+                    val curMa = bat.currentMa
+                    if (curMa != Int.MIN_VALUE) {
+                        _batteryCurrentHistoryBuffer.push(curMa.toFloat())
+                        _batteryCurrentHistory.value = _batteryCurrentHistoryBuffer.snapshot()
+                    }
+                }
                 _memory.value = LiveStats.memory(ctx)
                 _cpuCores.value = LiveStats.cpuCores()
                 _volumes.value = LiveStats.volumes()
