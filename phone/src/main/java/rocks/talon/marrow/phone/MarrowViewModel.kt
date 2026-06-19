@@ -26,6 +26,7 @@ import rocks.talon.marrow.phone.prefs.ThemeMode
 import rocks.talon.marrow.phone.sync.WatchInfoRepository
 import rocks.talon.marrow.shared.DeviceInfoCollector
 import rocks.talon.marrow.shared.DeviceInfoSnapshot
+import rocks.talon.marrow.shared.HistoryBuffer
 import rocks.talon.marrow.shared.LiveStats
 
 /**
@@ -115,6 +116,31 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
      */
     private val _systemLoadAvg = MutableStateFlow<Triple<Float, Float, Float>?>(null)
     val systemLoadAvg: StateFlow<Triple<Float, Float, Float>?> = _systemLoadAvg.asStateFlow()
+
+    // -- History buffers (for sparkline charts) ----------------------------------
+
+    /** Backing circular buffer for [cpuHistory]. Retains the last 60 CPU% samples. */
+    private val _cpuHistoryBuffer = HistoryBuffer(capacity = 60)
+
+    /**
+     * Rolling history of CPU utilisation percentages (0–100f), newest last.
+     * Updated each live-loop tick after [_cpuUsagePercent] is computed.
+     * Empty until two live-loop ticks have elapsed (first tick establishes the
+     * /proc/stat baseline; second tick produces the first valid percentage).
+     */
+    private val _cpuHistory = MutableStateFlow<List<Float>>(emptyList())
+    val cpuHistory: StateFlow<List<Float>> = _cpuHistory.asStateFlow()
+
+    /** Backing circular buffer for [ramHistory]. Retains the last 60 RAM-used% samples. */
+    private val _ramHistoryBuffer = HistoryBuffer(capacity = 60)
+
+    /**
+     * Rolling history of RAM utilisation percentages (0–100f), newest last.
+     * Derived from [_memory] (usedBytes / totalBytes × 100) each live-loop tick.
+     * Empty until the first [_memory] reading is available.
+     */
+    private val _ramHistory = MutableStateFlow<List<Float>>(emptyList())
+    val ramHistory: StateFlow<List<Float>> = _ramHistory.asStateFlow()
 
     /**
      * Live GPU stats — current frequency, min/max, governor, and utilisation.
@@ -618,6 +644,19 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _thermalZones.value = LiveStats.thermalZones()
                 // System load averages — /proc/loadavg, world-readable, no permissions needed
                 _systemLoadAvg.value = LiveStats.systemLoadAvg()
+                // History buffers — push latest CPU% and RAM% for sparkline charts
+                if (_cpuUsagePercent.value >= 0f) {
+                    _cpuHistoryBuffer.push(_cpuUsagePercent.value)
+                    _cpuHistory.value = _cpuHistoryBuffer.snapshot()
+                }
+                _memory.value?.let { mem ->
+                    if (mem.totalBytes > 0L) {
+                        val usedPct = (mem.usedBytes.toFloat() / mem.totalBytes.toFloat() * 100f)
+                            .coerceIn(0f, 100f)
+                        _ramHistoryBuffer.push(usedPct)
+                        _ramHistory.value = _ramHistoryBuffer.snapshot()
+                    }
+                }
                 // GPU — frequency, utilisation, governor (kgsl or generic devfreq)
                 _gpu.value = LiveStats.gpu()
                 // Wi-Fi RSSI — live signal strength in dBm (null when not on Wi-Fi)
