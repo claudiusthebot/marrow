@@ -67,6 +67,7 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val thermalStatus by vm.thermalStatus.collectAsState()
     val chargeEtaMs by vm.chargeTimeRemainingMs.collectAsState()
     val batterySaverActive by vm.batterySaverActive.collectAsState()
+    val batteryCurrentHistory by vm.batteryCurrentHistory.collectAsState()
     val percent = if (isWatch) {
         // For the watch, parse the battery section's "Level" row (already a string %)
         section.rows.firstOrNull { it.label == "Level" }?.value
@@ -175,6 +176,20 @@ fun BatteryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                 if (!isWatch && curMa != Int.MIN_VALUE) {
                     Spacer(Modifier.height(8.dp))
                     BigStat("Current", "$curMa mA")
+                    if (batteryCurrentHistory.size >= 2) {
+                        Spacer(Modifier.height(4.dp))
+                        val currentColor = when {
+                            curMa < 0 -> MaterialTheme.colorScheme.primary    // charging (positive current in)
+                            curMa > 1500 -> MaterialTheme.colorScheme.error   // heavy drain
+                            curMa > 500  -> MaterialTheme.colorScheme.secondary
+                            else         -> MaterialTheme.colorScheme.onSurface
+                        }
+                        SparklineChart(
+                            data = batteryCurrentHistory,
+                            lineColor = currentColor,
+                            modifier = Modifier.fillMaxWidth().height(36.dp),
+                        )
+                    }
                 }
                 val healthPct = battery?.healthPercent ?: -1
                 if (!isWatch && healthPct >= 0) {
