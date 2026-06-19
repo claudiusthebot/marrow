@@ -142,6 +142,30 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _ramHistory = MutableStateFlow<List<Float>>(emptyList())
     val ramHistory: StateFlow<List<Float>> = _ramHistory.asStateFlow()
 
+    /** Backing circular buffer for [rxHistory]. Retains the last 60 download-rate samples. */
+    private val _rxHistoryBuffer = HistoryBuffer(capacity = 60)
+
+    /**
+     * Rolling history of network download rates in bytes/sec (newest last).
+     * Updated each live-loop tick after [_networkRate] is computed.
+     * Empty until two live-loop ticks have elapsed (first tick establishes the
+     * TrafficStats baseline; second tick produces the first valid rate).
+     * Phone only — not pushed on watch.
+     */
+    private val _rxHistory = MutableStateFlow<List<Float>>(emptyList())
+    val rxHistory: StateFlow<List<Float>> = _rxHistory.asStateFlow()
+
+    /** Backing circular buffer for [txHistory]. Retains the last 60 upload-rate samples. */
+    private val _txHistoryBuffer = HistoryBuffer(capacity = 60)
+
+    /**
+     * Rolling history of network upload rates in bytes/sec (newest last).
+     * Same delta pattern and timing as [rxHistory].
+     * Phone only — not pushed on watch.
+     */
+    private val _txHistory = MutableStateFlow<List<Float>>(emptyList())
+    val txHistory: StateFlow<List<Float>> = _txHistory.asStateFlow()
+
     /**
      * Live GPU stats — current frequency, min/max, governor, and utilisation.
      * null until the first live-loop tick.
@@ -618,7 +642,13 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _volumes.value = LiveStats.volumes()
                 val netSnap = LiveStats.networkSnapshot()
                 prevNetSnapshot?.let { prev ->
-                    _networkRate.value = LiveStats.networkRate(prev, netSnap)
+                    val rate = LiveStats.networkRate(prev, netSnap)
+                    _networkRate.value = rate
+                    // Push to sparkline history buffers on every tick that has a valid rate
+                    _rxHistoryBuffer.push(rate.first.toFloat())
+                    _rxHistory.value = _rxHistoryBuffer.snapshot()
+                    _txHistoryBuffer.push(rate.second.toFloat())
+                    _txHistory.value = _txHistoryBuffer.snapshot()
                 }
                 prevNetSnapshot = netSnap
                 _cpuTempC.value = LiveStats.cpuTempC()

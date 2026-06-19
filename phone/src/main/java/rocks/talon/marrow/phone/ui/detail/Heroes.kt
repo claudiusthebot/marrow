@@ -1159,6 +1159,8 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
     // val (a, b) by delegate is not valid Kotlin syntax — split into two lines.
     val networkRatePair by vm.networkRate.collectAsState()
     val (rxBps, txBps) = networkRatePair
+    val rxHistory by vm.rxHistory.collectAsState()
+    val txHistory by vm.txHistory.collectAsState()
     val wifiRssiDbm by vm.wifiRssiDbm.collectAsState()
     val wifiSsid by vm.wifiSsid.collectAsState()
     val wifiLinkSpeedMbps by vm.wifiLinkSpeedMbps.collectAsState()
@@ -1267,6 +1269,22 @@ fun NetworkHero(vm: MarrowViewModel, section: Section) {
                     BigStat("↓ Download", LiveStats.formatSpeedBps(rxBps))
                     BigStat("↑ Upload", LiveStats.formatSpeedBps(txBps))
                 }
+            }
+            // Download sparkline — 60-sample rolling history, phone only
+            if (rxHistory.size >= 2) {
+                Spacer(Modifier.height(8.dp))
+                SparklineChart(
+                    data = rxHistory,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            // Upload sparkline — shown when we have data; secondary colour to distinguish from RX
+            if (txHistory.size >= 2) {
+                Spacer(Modifier.height(4.dp))
+                SparklineChart(
+                    data = txHistory,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
             }
             // Airplane mode — always shown once polled (non-null)
             val airplaneOn = isAirplaneModeOn
