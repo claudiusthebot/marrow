@@ -878,4 +878,48 @@ class LiveStatsTest {
         assertEquals("Outdoor", LiveStats.lightLevelCategory(50000f))
     }
 
+    // ── parseLoadAvg ──────────────────────────────────────────────────────────
+
+    @Test fun parseLoadAvg_typical_line_returns_correct_triple() {
+        val result = LiveStats.parseLoadAvg("1.23 4.56 7.89 12/345 6789")
+        assertNotNull(result)
+        assertEquals(1.23f, result!!.first, 0.001f)
+        assertEquals(4.56f, result.second, 0.001f)
+        assertEquals(7.89f, result.third, 0.001f)
+    }
+
+    @Test fun parseLoadAvg_zeros_returns_zero_triple() {
+        val result = LiveStats.parseLoadAvg("0.00 0.00 0.00 0/1 1")
+        assertNotNull(result)
+        assertEquals(0.00f, result!!.first, 0.001f)
+        assertEquals(0.00f, result.second, 0.001f)
+        assertEquals(0.00f, result.third, 0.001f)
+    }
+
+    @Test fun parseLoadAvg_high_load_round_trips() {
+        val result = LiveStats.parseLoadAvg("16.00 12.50 8.75 64/512 99999")
+        assertNotNull(result)
+        assertEquals(16.00f, result!!.first, 0.01f)
+        assertEquals(12.50f, result.second, 0.01f)
+        assertEquals(8.75f, result.third, 0.01f)
+    }
+
+    @Test fun parseLoadAvg_extra_whitespace_is_tolerated() {
+        val result = LiveStats.parseLoadAvg("  2.10  3.20  4.30  8/256 1234  ")
+        assertNotNull(result)
+        assertEquals(2.10f, result!!.first, 0.001f)
+    }
+
+    @Test fun parseLoadAvg_empty_string_returns_null() {
+        assertNull(LiveStats.parseLoadAvg(""))
+    }
+
+    @Test fun parseLoadAvg_only_two_fields_returns_null() {
+        assertNull(LiveStats.parseLoadAvg("1.23 4.56"))
+    }
+
+    @Test fun parseLoadAvg_non_numeric_field_returns_null() {
+        assertNull(LiveStats.parseLoadAvg("abc 4.56 7.89 12/345 6789"))
+    }
+
 }

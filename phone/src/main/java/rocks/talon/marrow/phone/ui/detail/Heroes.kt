@@ -272,6 +272,7 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val cpuTempC by vm.cpuTempC.collectAsState()
     val cpuUsage by vm.cpuUsagePercent.collectAsState()
     val thermalZones by vm.thermalZones.collectAsState()
+    val loadAvg by vm.systemLoadAvg.collectAsState()
     val coreCount = section.rows.firstOrNull { it.label == "Cores" }?.value?.toIntOrNull() ?: cores.size
     val abis = section.rows.firstOrNull { it.label == "ABIs" }?.value
         ?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
@@ -417,6 +418,14 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
             if (!isWatch && minFreqMhz != null) {
                 Spacer(Modifier.height(16.dp))
                 BigStat("Min Freq", "%.1f GHz".format(minFreqMhz / 1000f))
+            }
+            if (!isWatch && loadAvg != null) {
+                Spacer(Modifier.height(16.dp))
+                BigStat("Load 1m", "%.2f".format(loadAvg!!.first))
+                Spacer(Modifier.height(16.dp))
+                BigStat("Load 5m", "%.2f".format(loadAvg!!.second))
+                Spacer(Modifier.height(16.dp))
+                BigStat("Load 15m", "%.2f".format(loadAvg!!.third))
             }
             if (abis.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
