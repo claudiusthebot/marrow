@@ -50,6 +50,7 @@ import kotlin.math.roundToInt
 import rocks.talon.marrow.phone.MarrowViewModel
 import rocks.talon.marrow.phone.ui.components.IconBadge
 import rocks.talon.marrow.phone.ui.components.MarrowCard
+import rocks.talon.marrow.phone.ui.components.SparklineChart
 import rocks.talon.marrow.phone.ui.icons.MarrowIcons
 import rocks.talon.marrow.shared.LiveStats
 import rocks.talon.marrow.shared.Section
@@ -273,6 +274,7 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val cpuUsage by vm.cpuUsagePercent.collectAsState()
     val thermalZones by vm.thermalZones.collectAsState()
     val loadAvg by vm.systemLoadAvg.collectAsState()
+    val cpuHistory by vm.cpuHistory.collectAsState()
     val coreCount = section.rows.firstOrNull { it.label == "Cores" }?.value?.toIntOrNull() ?: cores.size
     val abis = section.rows.firstOrNull { it.label == "ABIs" }?.value
         ?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
@@ -426,6 +428,19 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                 BigStat("Load 5m", "%.2f".format(loadAvg!!.second))
                 Spacer(Modifier.height(16.dp))
                 BigStat("Load 15m", "%.2f".format(loadAvg!!.third))
+            }
+            // CPU sparkline — 60-second rolling history, phone only
+            if (!isWatch && cpuHistory.size >= 2) {
+                Spacer(Modifier.height(16.dp))
+                val sparkColor = when {
+                    cpuUsage >= 90f -> Color(0xFFE53935)
+                    cpuUsage >= 70f -> Color(0xFFFFA726)
+                    else -> MaterialTheme.colorScheme.primary
+                }
+                SparklineChart(
+                    data = cpuHistory,
+                    color = sparkColor,
+                )
             }
             if (abis.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
@@ -621,6 +636,7 @@ private enum class MemoryPressure(
 @Composable
 fun MemoryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val mem by vm.memory.collectAsState()
+    val ramHistory by vm.ramHistory.collectAsState()
     val totalBytes = if (isWatch) parseBytes(section.rows.firstOrNull { it.label == "Total RAM" }?.value) else mem?.totalBytes ?: 0L
     val availBytes = if (isWatch) parseBytes(section.rows.firstOrNull { it.label == "Available RAM" }?.value) else mem?.availBytes ?: 0L
     val usedBytes = (totalBytes - availBytes).coerceAtLeast(0L)
@@ -750,6 +766,14 @@ fun MemoryHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
             if (!isWatch) {
                 Spacer(Modifier.height(16.dp))
                 BigStat("RAM State", pressure.label, valueColor = pressure.color)
+            }
+            // RAM sparkline — 60-second rolling history, phone only
+            if (!isWatch && ramHistory.size >= 2) {
+                Spacer(Modifier.height(16.dp))
+                SparklineChart(
+                    data = ramHistory,
+                    color = pressure.color,
+                )
             }
         }
     }
