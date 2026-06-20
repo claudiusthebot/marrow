@@ -41,6 +41,7 @@ import rocks.talon.marrow.phone.ui.watch.WatchTab
 object Routes {
     const val DEVICE = "device"
     const val WATCH = "watch"
+    const val OVERVIEW = "overview"
     const val ABOUT = "about"
     const val DETAIL = "detail/{sectionId}"
     const val SETTINGS = "settings"
@@ -54,7 +55,7 @@ fun MarrowApp(vm: MarrowViewModel) {
         val nav = rememberNavController()
         val backStack by nav.currentBackStackEntryAsState()
         val currentRoute = backStack?.destination?.route
-        val showBottomBar = currentRoute in setOf(Routes.DEVICE, Routes.WATCH, Routes.ABOUT)
+        val showBottomBar = currentRoute in setOf(Routes.DEVICE, Routes.WATCH, Routes.OVERVIEW, Routes.ABOUT)
 
         Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -94,6 +95,9 @@ fun MarrowApp(vm: MarrowViewModel) {
                     composable(Routes.WATCH) {
                         WatchTab(vm = vm, onSection = { id -> nav.navigate(Routes.detail("watch:$id")) })
                     }
+                    composable(Routes.OVERVIEW) {
+                        OverviewTab(vm = vm)
+                    }
                     composable(Routes.ABOUT) {
                         AboutTab(vm = vm, onOpenSettings = { nav.navigate(Routes.SETTINGS) })
                     }
@@ -124,6 +128,7 @@ private fun MarrowBottomBar(active: String, onTab: (String) -> Unit) {
     ) {
         NavBarTab(active, Routes.DEVICE, "Device", MarrowIcons.Device, onTab)
         NavBarTab(active, Routes.WATCH, "Watch", MarrowIcons.Watch, onTab)
+        NavBarTab(active, Routes.OVERVIEW, "Overview", MarrowIcons.Overview, onTab)
         NavBarTab(active, Routes.ABOUT, "About", MarrowIcons.Wordmark, onTab)
     }
 }
