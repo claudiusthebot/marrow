@@ -20,6 +20,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import rocks.talon.marrow.shared.DeviceInfoCollector
 import rocks.talon.marrow.shared.DeviceInfoSnapshot
+import rocks.talon.marrow.shared.HistoryBuffer
 import rocks.talon.marrow.shared.LiveStats
 import rocks.talon.marrow.wear.sync.pingPhone
 
@@ -70,8 +71,18 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val _battery = MutableStateFlow<LiveStats.Battery?>(null)
     val battery: StateFlow<LiveStats.Battery?> = _battery.asStateFlow()
 
+    /** Rolling 60-sample history of battery level % for the home-screen sparkline. */
+    private val batteryHistoryBuffer = HistoryBuffer(60)
+    private val _batteryHistory = MutableStateFlow<List<Float>>(emptyList())
+    val batteryHistory: StateFlow<List<Float>> = _batteryHistory.asStateFlow()
+
     private val _memory = MutableStateFlow<LiveStats.Memory?>(null)
     val memory: StateFlow<LiveStats.Memory?> = _memory.asStateFlow()
+
+    /** Rolling 60-sample history of RAM used % for the home-screen sparkline. */
+    private val ramHistoryBuffer = HistoryBuffer(60)
+    private val _ramHistory = MutableStateFlow<List<Float>>(emptyList())
+    val ramHistory: StateFlow<List<Float>> = _ramHistory.asStateFlow()
 
     /** Live CPU core frequency snapshots. Updated in the live loop. Empty list until
      *  first tick, or on emulators / SELinux-restricted devices. */
@@ -212,11 +223,22 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         if (liveJob?.isActive == true) return
         liveJob = viewModelScope.launch(Dispatchers.IO) {
             while (true) {
-                _battery.value = LiveStats.battery(getApplication())
-                _memory.value = LiveStats.memory(getApplication())
+                val batt = LiveStats.battery(getApplication())
+                val mem = LiveStats.memory(getApplication())
+                _battery.value = batt
+                _memory.value = mem
                 _cpuCores.value = LiveStats.cpuCores()
                 _gpu.value = LiveStats.gpu()
                 _cellular.value = LiveStats.cellularInfo(getApplication())
+                // Update sparkline history buffers for the home-screen charts.
+                batt?.percent?.let { pct ->
+                    batteryHistoryBuffer.push(pct.toFloat())
+                    _batteryHistory.value = batteryHistoryBuffer.snapshot()
+                }
+                mem?.usedPercent?.let { pct ->
+                    ramHistoryBuffer.push(pct.toFloat())
+                    _ramHistory.value = ramHistoryBuffer.snapshot()
+                }
                 delay(10_000L)
             }
         }
