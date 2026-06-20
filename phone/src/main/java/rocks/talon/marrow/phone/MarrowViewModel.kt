@@ -31,6 +31,7 @@ import rocks.talon.marrow.shared.DeviceInfoCollector
 import rocks.talon.marrow.shared.DeviceInfoSnapshot
 import rocks.talon.marrow.shared.HistoryBuffer
 import rocks.talon.marrow.shared.LiveStats
+import rocks.talon.marrow.shared.SparklineRange
 
 /**
  * App-wide state holder.
@@ -123,8 +124,29 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
 
     // -- History buffers (for sparkline charts) ----------------------------------
 
-    /** Backing circular buffer for [cpuHistory]. Retains the last 60 CPU% samples. */
-    private val _cpuHistoryBuffer = HistoryBuffer(capacity = 60)
+    // -- Sparkline range ---------------------------------------------------------
+
+    /** Selected time window for all sparkline charts. Defaults to 1-minute view. */
+    private val _sparklineRange = MutableStateFlow(SparklineRange.ONE_MIN)
+    val sparklineRange: StateFlow<SparklineRange> = _sparklineRange.asStateFlow()
+
+    /**
+     * Switch all four sparkline charts to [range].
+     * Recomputes the current visible slice immediately from the full backing buffers.
+     */
+    fun setSparklineRange(range: SparklineRange) {
+        _sparklineRange.value = range
+        _cpuHistory.value              = _cpuHistoryBuffer.lastN(range.samples)
+        _ramHistory.value              = _ramHistoryBuffer.lastN(range.samples)
+        _rxHistory.value               = _rxHistoryBuffer.lastN(range.samples)
+        _txHistory.value               = _txHistoryBuffer.lastN(range.samples)
+        _batteryCurrentHistory.value   = _batteryCurrentHistoryBuffer.lastN(range.samples)
+    }
+
+    // -- History buffers (for sparkline charts) ----------------------------------
+
+    /** Backing circular buffer for [cpuHistory]. Retains up to 15 min of CPU% samples. */
+    private val _cpuHistoryBuffer = HistoryBuffer(capacity = 900)
 
     /**
      * Rolling history of CPU utilisation percentages (0–100f), newest last.
@@ -135,8 +157,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _cpuHistory = MutableStateFlow<List<Float>>(emptyList())
     val cpuHistory: StateFlow<List<Float>> = _cpuHistory.asStateFlow()
 
-    /** Backing circular buffer for [ramHistory]. Retains the last 60 RAM-used% samples. */
-    private val _ramHistoryBuffer = HistoryBuffer(capacity = 60)
+    /** Backing circular buffer for [ramHistory]. Retains up to 15 min of RAM-used% samples. */
+    private val _ramHistoryBuffer = HistoryBuffer(capacity = 900)
 
     /**
      * Rolling history of RAM utilisation percentages (0–100f), newest last.
@@ -146,8 +168,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _ramHistory = MutableStateFlow<List<Float>>(emptyList())
     val ramHistory: StateFlow<List<Float>> = _ramHistory.asStateFlow()
 
-    /** Backing circular buffer for [rxHistory]. Retains the last 60 download-rate samples. */
-    private val _rxHistoryBuffer = HistoryBuffer(capacity = 60)
+    /** Backing circular buffer for [rxHistory]. Retains up to 15 min of download-rate samples. */
+    private val _rxHistoryBuffer = HistoryBuffer(capacity = 900)
 
     /**
      * Rolling history of network download rates in bytes/sec (newest last).
@@ -159,8 +181,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _rxHistory = MutableStateFlow<List<Float>>(emptyList())
     val rxHistory: StateFlow<List<Float>> = _rxHistory.asStateFlow()
 
-    /** Backing circular buffer for [txHistory]. Retains the last 60 upload-rate samples. */
-    private val _txHistoryBuffer = HistoryBuffer(capacity = 60)
+    /** Backing circular buffer for [txHistory]. Retains up to 15 min of upload-rate samples. */
+    private val _txHistoryBuffer = HistoryBuffer(capacity = 900)
 
     /**
      * Rolling history of network upload rates in bytes/sec (newest last).
@@ -170,8 +192,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _txHistory = MutableStateFlow<List<Float>>(emptyList())
     val txHistory: StateFlow<List<Float>> = _txHistory.asStateFlow()
 
-    /** Backing circular buffer for [batteryCurrentHistory]. Retains the last 60 current-mA samples. */
-    private val _batteryCurrentHistoryBuffer = HistoryBuffer(capacity = 60)
+    /** Backing circular buffer for [batteryCurrentHistory]. Retains up to 15 min of current-mA samples. */
+    private val _batteryCurrentHistoryBuffer = HistoryBuffer(capacity = 900)
 
     /**
      * Rolling history of battery current draw in mA (newest last).
@@ -644,11 +666,12 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
             snapshot.ram.forEach       { _ramHistoryBuffer.push(it) }
             snapshot.networkRx.forEach { _rxHistoryBuffer.push(it) }
             snapshot.batteryMa.forEach { _batteryCurrentHistoryBuffer.push(it) }
-            // Publish the seeded state so the UI shows history immediately
-            if (snapshot.cpu.isNotEmpty())       _cpuHistory.value = _cpuHistoryBuffer.snapshot()
-            if (snapshot.ram.isNotEmpty())       _ramHistory.value = _ramHistoryBuffer.snapshot()
-            if (snapshot.networkRx.isNotEmpty()) _rxHistory.value  = _rxHistoryBuffer.snapshot()
-            if (snapshot.batteryMa.isNotEmpty()) _batteryCurrentHistory.value = _batteryCurrentHistoryBuffer.snapshot()
+            // Publish the seeded state so the UI shows history immediately (sliced to selected range)
+            val rangeN = _sparklineRange.value.samples
+            if (snapshot.cpu.isNotEmpty())       _cpuHistory.value = _cpuHistoryBuffer.lastN(rangeN)
+            if (snapshot.ram.isNotEmpty())       _ramHistory.value = _ramHistoryBuffer.lastN(rangeN)
+            if (snapshot.networkRx.isNotEmpty()) _rxHistory.value  = _rxHistoryBuffer.lastN(rangeN)
+            if (snapshot.batteryMa.isNotEmpty()) _batteryCurrentHistory.value = _batteryCurrentHistoryBuffer.lastN(rangeN)
         }
     }
 
@@ -691,7 +714,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                     val curMa = bat.currentMa
                     if (curMa != Int.MIN_VALUE) {
                         _batteryCurrentHistoryBuffer.push(curMa.toFloat())
-                        _batteryCurrentHistory.value = _batteryCurrentHistoryBuffer.snapshot()
+                        _batteryCurrentHistory.value = _batteryCurrentHistoryBuffer.lastN(_sparklineRange.value.samples)
                     }
                 }
                 _memory.value = LiveStats.memory(ctx)
@@ -702,10 +725,11 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                     val rate = LiveStats.networkRate(prev, netSnap)
                     _networkRate.value = rate
                     // Push to sparkline history buffers on every tick that has a valid rate
+                    val rangeN = _sparklineRange.value.samples
                     _rxHistoryBuffer.push(rate.first.toFloat())
-                    _rxHistory.value = _rxHistoryBuffer.snapshot()
+                    _rxHistory.value = _rxHistoryBuffer.lastN(rangeN)
                     _txHistoryBuffer.push(rate.second.toFloat())
-                    _txHistory.value = _txHistoryBuffer.snapshot()
+                    _txHistory.value = _txHistoryBuffer.lastN(rangeN)
                 }
                 prevNetSnapshot = netSnap
                 _cpuTempC.value = LiveStats.cpuTempC()
@@ -732,16 +756,17 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 // System load averages — /proc/loadavg, world-readable, no permissions needed
                 _systemLoadAvg.value = LiveStats.systemLoadAvg()
                 // History buffers — push latest CPU% and RAM% for sparkline charts
+                val histN = _sparklineRange.value.samples
                 if (_cpuUsagePercent.value >= 0f) {
                     _cpuHistoryBuffer.push(_cpuUsagePercent.value)
-                    _cpuHistory.value = _cpuHistoryBuffer.snapshot()
+                    _cpuHistory.value = _cpuHistoryBuffer.lastN(histN)
                 }
                 _memory.value?.let { mem ->
                     if (mem.totalBytes > 0L) {
                         val usedPct = (mem.usedBytes.toFloat() / mem.totalBytes.toFloat() * 100f)
                             .coerceIn(0f, 100f)
                         _ramHistoryBuffer.push(usedPct)
-                        _ramHistory.value = _ramHistoryBuffer.snapshot()
+                        _ramHistory.value = _ramHistoryBuffer.lastN(histN)
                     }
                 }
                 // GPU — frequency, utilisation, governor (kgsl or generic devfreq)
