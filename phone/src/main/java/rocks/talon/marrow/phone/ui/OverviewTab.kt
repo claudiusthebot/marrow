@@ -22,14 +22,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import rocks.talon.marrow.phone.MarrowViewModel
 import rocks.talon.marrow.phone.ui.components.SparklineChart
+import rocks.talon.marrow.phone.ui.components.SparklineRangeSelector
 
 /**
  * OverviewTab — a single-glance dashboard showing all four sparklines
  * (CPU, RAM, Network RX, Battery Current) side by side in card form.
  *
- * First Marrow screen that aggregates data across heroes rather than
- * drilling into a single section. Intentionally minimal — just the shape
- * of the signal, the current value, and the label.
+ * A segmented time-range selector (1m / 5m / 15m) sits below the section
+ * header and applies uniformly to all four charts. The backing [HistoryBuffer]s
+ * in the ViewModel retain up to 15 minutes of data so any window can be
+ * satisfied from a single buffer without re-collecting old data.
  */
 @Composable
 fun OverviewTab(vm: MarrowViewModel) {
@@ -41,6 +43,7 @@ fun OverviewTab(vm: MarrowViewModel) {
     val memory by vm.memory.collectAsState()
     val networkRate by vm.networkRate.collectAsState()
     val battery by vm.battery.collectAsState()
+    val selectedRange by vm.sparklineRange.collectAsState()
 
     val cpuColor = when {
         cpuUsage > 80f -> MaterialTheme.colorScheme.error
@@ -68,11 +71,21 @@ fun OverviewTab(vm: MarrowViewModel) {
         contentPadding = PaddingValues(top = 20.dp, bottom = 24.dp),
     ) {
         item {
-            Text(
-                text = "Overview",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Overview",
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+                SparklineRangeSelector(
+                    selected = selectedRange,
+                    onRangeSelected = { vm.setSparklineRange(it) },
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
         item {
             SparklineCard(
