@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +23,8 @@ import kotlinx.coroutines.withContext
 import rocks.talon.marrow.phone.notification.MarrowNotificationService
 import rocks.talon.marrow.phone.prefs.Settings
 import rocks.talon.marrow.phone.prefs.SettingsRepository
+import rocks.talon.marrow.phone.prefs.SparklineHistoryRepository
+import rocks.talon.marrow.phone.prefs.SparklineSnapshot
 import rocks.talon.marrow.phone.prefs.ThemeMode
 import rocks.talon.marrow.phone.sync.WatchInfoRepository
 import rocks.talon.marrow.shared.DeviceInfoCollector
@@ -41,6 +44,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
 
     private val watchRepo = WatchInfoRepository.get(app)
     private val settingsRepo = SettingsRepository.get(app)
+    private val sparklineRepo = SparklineHistoryRepository.get(app)
 
     // -- Snapshots ---------------------------------------------------------------
 
@@ -595,6 +599,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         startLinearAccelSensor()
         startMagnetometerSensor()
         startProximitySensor()
+        loadSparklineHistory()
     }
 
     // -- Operations --------------------------------------------------------------
@@ -624,6 +629,37 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _watchRefreshing.value = false
             }
         }
+    }
+
+    /**
+     * Seed all four sparkline history buffers from the persisted DataStore snapshot.
+     * Runs asynchronously on IO — the live loop may start adding new values before
+     * this completes, but that is harmless (live values append to whatever the
+     * buffers already contain once the seed coroutine runs).
+     */
+    private fun loadSparklineHistory() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val snapshot = sparklineRepo.load()
+            snapshot.cpu.forEach       { _cpuHistoryBuffer.push(it) }
+            snapshot.ram.forEach       { _ramHistoryBuffer.push(it) }
+            snapshot.networkRx.forEach { _rxHistoryBuffer.push(it) }
+            snapshot.batteryMa.forEach { _batteryCurrentHistoryBuffer.push(it) }
+            // Publish the seeded state so the UI shows history immediately
+            if (snapshot.cpu.isNotEmpty())       _cpuHistory.value = _cpuHistoryBuffer.snapshot()
+            if (snapshot.ram.isNotEmpty())       _ramHistory.value = _ramHistoryBuffer.snapshot()
+            if (snapshot.networkRx.isNotEmpty()) _rxHistory.value  = _rxHistoryBuffer.snapshot()
+            if (snapshot.batteryMa.isNotEmpty()) _batteryCurrentHistory.value = _batteryCurrentHistoryBuffer.snapshot()
+        }
+    }
+
+    /** Save all four sparkline histories to DataStore. */
+    private suspend fun saveSparklineHistory() {
+        sparklineRepo.save(SparklineSnapshot(
+            cpu       = _cpuHistoryBuffer.snapshot(),
+            ram       = _ramHistoryBuffer.snapshot(),
+            networkRx = _rxHistoryBuffer.snapshot(),
+            batteryMa = _batteryCurrentHistoryBuffer.snapshot(),
+        ))
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -1185,6 +1221,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         liveJob?.cancel()
         pingJob?.cancel()
+        // Persist sparkline histories so charts survive the next app launch
+        runBlocking(Dispatchers.IO) { saveSparklineHistory() }
         locationListener?.let { locationManager?.removeUpdates(it) }
         lightSensorListener?.let { sensorManager?.unregisterListener(it) }
         val sm = getApplication<Application>()
