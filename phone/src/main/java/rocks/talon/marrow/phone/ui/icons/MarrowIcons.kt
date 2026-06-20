@@ -314,6 +314,30 @@ object MarrowIcons {
             .stroke("M12 11 V12.5 L13.5 13.5")
     }
 
+    /**
+     * Overview icon — a 2×2 grid of mini sparklines representing the
+     * dashboard tab that shows all four live-history charts at once.
+     *
+     * Design: outer rounded rectangle divided into four quadrants by a
+     * horizontal and vertical divider; each quadrant holds a 3-point
+     * sparkline fragment illustrating different signal shapes.
+     */
+    val Overview: ImageVector = marrow("Overview") {
+        // Outer rounded rect
+        stroke("M 3,4 C 3,3.45 3.45,3 4,3 H 20 C 20.55,3 21,3.45 21,4 V 20 C 21,20.55 20.55,21 20,21 H 4 C 3.45,21 3,20.55 3,20 Z")
+            // Dividers
+            .stroke("M 3,12 H 21")
+            .stroke("M 12,3 V 21")
+            // Top-left: CPU sparkline fragment (rises then dips)
+            .stroke("M 4.5,9 L 7,6 L 10.5,8.5")
+            // Top-right: RAM sparkline fragment (steady rise)
+            .stroke("M 13.5,9.5 L 16,7 L 20,5.5")
+            // Bottom-left: Network sparkline fragment (spike)
+            .stroke("M 4.5,18.5 L 7,16 L 8.5,20 L 10.5,15.5")
+            // Bottom-right: Battery sparkline fragment (gradual decline)
+            .stroke("M 13.5,15 L 16,16.5 L 20,18.5")
+    }
+
     fun forSection(id: String): ImageVector = when (id) {
         Sections.DEVICE -> Device
         Sections.SYSTEM -> System
