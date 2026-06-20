@@ -13,8 +13,8 @@ android {
         applicationId = "rocks.talon.marrow"
         minSdk = 33  // Wear OS 4+; we target Pixel Watch 3 (Wear OS 6).
         targetSdk = 36
-        versionCode = 23
-        versionName = "0.50.0"
+        versionCode = 24
+        versionName = "1.1.0"
     }
 
     buildTypes {
