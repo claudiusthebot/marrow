@@ -68,6 +68,7 @@ import rocks.talon.marrow.shared.Section
 import rocks.talon.marrow.shared.Sections
 import rocks.talon.marrow.wear.WearViewModel
 import rocks.talon.marrow.wear.ui.theme.MarrowWearTheme
+import rocks.talon.marrow.wear.ui.WearSparklineChart
 
 /**
  * Root composable for the watch app.
@@ -151,6 +152,8 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
     val refreshing by vm.refreshing.collectAsState()
     val battery by vm.battery.collectAsState()
     val memory by vm.memory.collectAsState()
+    val batteryHistory by vm.batteryHistory.collectAsState()
+    val ramHistory by vm.ramHistory.collectAsState()
     val stepCount by vm.stepCount.collectAsState()
     val heartRateBpm by vm.heartRateBpm.collectAsState()
     val cellular by vm.cellular.collectAsState()
@@ -236,6 +239,8 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
                     LiveStatsRow(
                         battery = battery,
                         memory = memory,
+                        batteryHistory = batteryHistory,
+                        ramHistory = ramHistory,
                         modifier = Modifier
                             .fillMaxWidth()
                             .transformedHeight(this, transformSpec),
@@ -351,6 +356,8 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
 private fun LiveStatsRow(
     battery: LiveStats.Battery?,
     memory: LiveStats.Memory?,
+    batteryHistory: List<Float>,
+    ramHistory: List<Float>,
     modifier: Modifier,
     transformation: SurfaceTransformation,
 ) {
@@ -373,7 +380,10 @@ private fun LiveStatsRow(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f),
+            ) {
                 Icon(
                     imageVector = WearIcons.Battery,
                     contentDescription = "Battery",
@@ -392,9 +402,22 @@ private fun LiveStatsRow(
                         color = MaterialTheme.colorScheme.tertiary,
                     )
                 }
+                if (batteryHistory.size >= 2) {
+                    WearSparklineChart(
+                        data = batteryHistory,
+                        color = battColor,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(24.dp)
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                    )
+                }
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f),
+            ) {
                 Icon(
                     imageVector = WearIcons.Memory,
                     contentDescription = "RAM",
@@ -411,6 +434,16 @@ private fun LiveStatsRow(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (ramHistory.size >= 2) {
+                    WearSparklineChart(
+                        data = ramHistory,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(24.dp)
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                    )
+                }
             }
         }
     }
