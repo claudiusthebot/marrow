@@ -37,6 +37,26 @@ class HistoryBuffer(val capacity: Int = 60) {
     @Synchronized
     fun snapshot(): List<Float> = buffer.toList()
 
+    /**
+     * Return an immutable snapshot of the **last [n] entries** (oldest first, newest last).
+     *
+     * - If [n] ≥ [size], returns all entries (equivalent to [snapshot]).
+     * - If [n] == 0, returns an empty list.
+     * - Allocates a new list on each call.
+     *
+     * Useful for slicing a large backing buffer to the visible sparkline window
+     * without keeping multiple buffers of different sizes.
+     *
+     * @param n Number of most-recent entries to return. Must be ≥ 0.
+     */
+    @Synchronized
+    fun lastN(n: Int): List<Float> {
+        require(n >= 0) { "n must be >= 0, got $n" }
+        if (n == 0) return emptyList()
+        return if (n >= buffer.size) buffer.toList()
+        else buffer.drop(buffer.size - n)
+    }
+
     /** Remove all entries. */
     @Synchronized
     fun clear() = buffer.clear()
