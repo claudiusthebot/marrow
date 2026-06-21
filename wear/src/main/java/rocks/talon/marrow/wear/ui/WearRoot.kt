@@ -157,6 +157,8 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
     val stepCount by vm.stepCount.collectAsState()
     val heartRateBpm by vm.heartRateBpm.collectAsState()
     val cellular by vm.cellular.collectAsState()
+    val rxHistory by vm.rxHistory.collectAsState()
+    val txHistory by vm.txHistory.collectAsState()
 
     // Check BODY_SENSORS permission. If not granted, the HR sensor never fires
     // and heartRateBpm stays null — HeartRatePermissionCard is shown instead.
@@ -241,6 +243,21 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
                         memory = memory,
                         batteryHistory = batteryHistory,
                         ramHistory = ramHistory,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .transformedHeight(this, transformSpec),
+                        transformation = SurfaceTransformation(transformSpec),
+                    )
+                }
+            }
+
+            // Network throughput sparklines — visible after 2+ live ticks (one per 10s).
+            // Shows download (RX) and upload (TX) rate history charts side by side.
+            if (!isLoading && rxHistory.size >= 2) {
+                item {
+                    NetworkSparklineCard(
+                        rxHistory = rxHistory,
+                        txHistory = txHistory,
                         modifier = Modifier
                             .fillMaxWidth()
                             .transformedHeight(this, transformSpec),
@@ -438,6 +455,79 @@ private fun LiveStatsRow(
                     WearSparklineChart(
                         data = ramHistory,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(24.dp)
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Compact two-column network-throughput card for the home screen.
+ *
+ * Shows rolling RX (download) and TX (upload) rate sparklines from the live
+ * polling loop. Only rendered once [rxHistory] has ≥ 2 samples — typically
+ * appears after 20 s (two 10 s live-loop ticks).
+ *
+ * Uses [WearSparklineChart] directly — same component as the battery/RAM
+ * sparklines in [LiveStatsRow], compact enough for the circular Wear OS display.
+ * RX = primary colour (download bias); TX = secondary colour (upload).
+ * Zero new permissions — reads [android.net.TrafficStats] which is world-readable.
+ */
+@Composable
+private fun NetworkSparklineCard(
+    rxHistory: List<Float>,
+    txHistory: List<Float>,
+    modifier: Modifier,
+    transformation: SurfaceTransformation,
+) {
+    Card(
+        onClick = {},
+        modifier = modifier,
+        transformation = transformation,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(
+                    text = "↓ RX",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                if (rxHistory.size >= 2) {
+                    WearSparklineChart(
+                        data = rxHistory,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(24.dp)
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                    )
+                }
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(
+                    text = "↑ TX",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                if (txHistory.size >= 2) {
+                    WearSparklineChart(
+                        data = txHistory,
+                        color = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(24.dp)
