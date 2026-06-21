@@ -923,4 +923,60 @@ class LiveStatsTest {
         assertNull(LiveStats.parseLoadAvg("abc 4.56 7.89 12/345 6789"))
     }
 
+    // ── dewPointC ─────────────────────────────────────────────────────────────
+
+    @Test fun dewPoint_at_20C_50pct_is_approx_9_3C() {
+        // Classic textbook example: 20 °C, 50 % RH → dew point ≈ 9.3 °C
+        assertEquals(9.3f, LiveStats.dewPointC(20f, 50f), 0.2f)
+    }
+
+    @Test fun dewPoint_at_100pct_equals_temp() {
+        // At 100 % RH the air is fully saturated — dew point equals dry-bulb temp.
+        assertEquals(25.0f, LiveStats.dewPointC(25f, 100f), 0.1f)
+    }
+
+    @Test fun dewPoint_at_0C_80pct_is_negative() {
+        // 0 °C, 80 % RH → dew point should be below 0 °C
+        val dp = LiveStats.dewPointC(0f, 80f)
+        assertTrue("Dew point at 0 °C / 80 % RH should be < 0 but got $dp", dp < 0f)
+    }
+
+    @Test fun dewPoint_at_30C_70pct_is_approx_23_9C() {
+        // Humid tropical condition: 30 °C, 70 % RH → dew point ≈ 23.9 °C
+        assertEquals(23.9f, LiveStats.dewPointC(30f, 70f), 0.3f)
+    }
+
+    @Test fun dewPoint_very_low_humidity_is_approx_minus_38C() {
+        // 20 °C, 1 % RH → dew point ≈ −38 °C (extremely dry air)
+        assertEquals(-38.0f, LiveStats.dewPointC(20f, 1f), 0.5f)
+    }
+
+    // ── pressureToAltitudeM ───────────────────────────────────────────────────
+
+    @Test fun pressure_at_sea_level_returns_zero_altitude() {
+        // 1013.25 hPa is the standard sea-level reference — altitude should be ~0 m.
+        assertEquals(0f, LiveStats.pressureToAltitudeM(1013.25f), 1f)
+    }
+
+    @Test fun pressure_at_950hpa_is_approx_540m() {
+        // 950 hPa corresponds to roughly 540 m ASL (typical mountain valley).
+        assertEquals(540f, LiveStats.pressureToAltitudeM(950f), 10f)
+    }
+
+    @Test fun pressure_at_900hpa_is_approx_988m() {
+        // 900 hPa ≈ 988 m ASL (low mountain).
+        assertEquals(988f, LiveStats.pressureToAltitudeM(900f), 15f)
+    }
+
+    @Test fun pressure_at_700hpa_is_approx_3012m() {
+        // 700 hPa ≈ 3012 m ASL (high alpine).
+        assertEquals(3012f, LiveStats.pressureToAltitudeM(700f), 30f)
+    }
+
+    @Test fun pressure_above_sea_level_returns_negative_altitude() {
+        // Pressure higher than standard sea level implies below sea level (e.g. Dead Sea).
+        val alt = LiveStats.pressureToAltitudeM(1020f)
+        assertTrue("Altitude for >1013.25 hPa should be negative but got $alt", alt < 0f)
+    }
+
 }
