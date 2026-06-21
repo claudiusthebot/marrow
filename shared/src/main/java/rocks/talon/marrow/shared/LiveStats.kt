@@ -1634,6 +1634,61 @@ object LiveStats {
         parseLoadAvg(File("/proc/loadavg").readText())
     }.getOrNull()
 
+    // -- Derived environment stats -----------------------------------------------
+
+    /**
+     * Computes the dew-point temperature in °C using the Magnus formula.
+     *
+     * The dew point is the temperature to which air must be cooled for water
+     * vapour to condense. It is derived from the measured dry-bulb temperature
+     * and relative humidity — no additional sensor is required beyond what
+     * [rocks.talon.marrow.phone.MarrowViewModel] already collects via
+     * [android.hardware.Sensor.TYPE_AMBIENT_TEMPERATURE] and
+     * [android.hardware.Sensor.TYPE_RELATIVE_HUMIDITY].
+     *
+     * Formula: Magnus approximation (Alduchov & Eskridge 1996 constants)
+     *   γ(T, RH) = ln(RH/100) + a·T / (b + T)
+     *   Tdew     = b · γ / (a − γ)
+     * where a = 17.625 and b = 243.04 °C.
+     *
+     * Accurate to ±0.35 °C for −40 °C ≤ T ≤ 60 °C, 1 % ≤ RH ≤ 100 %.
+     *
+     * @param ambientTempC Dry-bulb temperature in degrees Celsius.
+     * @param humidityPct  Relative humidity in percent (0–100).
+     * @return Dew-point temperature in degrees Celsius.
+     */
+    fun dewPointC(ambientTempC: Float, humidityPct: Float): Float {
+        val a = 17.625
+        val b = 243.04
+        val rh = humidityPct.coerceIn(0.01f, 100f).toDouble()
+        val t  = ambientTempC.toDouble()
+        val gamma = Math.log(rh / 100.0) + a * t / (b + t)
+        return (b * gamma / (a - gamma)).toFloat()
+    }
+
+    /**
+     * Estimates altitude above sea level from barometric pressure using the
+     * International Standard Atmosphere (ISA) barometric formula.
+     *
+     * The formula assumes a standard sea-level pressure of 1013.25 hPa, a
+     * standard temperature lapse rate of 6.5 K/km, and a mean temperature of
+     * 288.15 K at sea level (ISA conditions). Real-world accuracy depends on
+     * local weather conditions; typical error is ±30–50 m at low altitudes.
+     *
+     * Formula: h = 44 330 · [1 − (P / P₀)^0.1903]
+     * where P₀ = 1013.25 hPa is the standard sea-level pressure.
+     *
+     * No permissions required — derived from [android.hardware.Sensor.TYPE_PRESSURE]
+     * which [rocks.talon.marrow.phone.MarrowViewModel] already registers.
+     *
+     * @param hpa Barometric pressure in hectopascals (hPa / mbar).
+     * @return Estimated altitude in metres above sea level.
+     */
+    fun pressureToAltitudeM(hpa: Float): Float {
+        val seaLevel = 1013.25
+        return (44330.0 * (1.0 - Math.pow(hpa / seaLevel, 0.1903))).toFloat()
+    }
+
     // -- helpers -----------------------------------------------------------------
 
     private fun readLong(path: String): Long =

@@ -1438,6 +1438,8 @@ fun EnvironmentHero(vm: MarrowViewModel, section: Section, isPhone: Boolean) {
             if (isPhone && hpa != null) {
                 Spacer(Modifier.height(12.dp))
                 BigStat("Pressure", "%.1f hPa".format(hpa))
+                Spacer(Modifier.height(12.dp))
+                BigStat("Altitude", "%.0f m".format(LiveStats.pressureToAltitudeM(hpa)))
             }
             val tempC = ambientTempC
             if (isPhone && tempC != null) {
@@ -1470,6 +1472,10 @@ fun EnvironmentHero(vm: MarrowViewModel, section: Section, isPhone: Boolean) {
             if (isPhone && humidityPct != null) {
                 Spacer(Modifier.height(12.dp))
                 BigStat("Humidity", "%.1f%% RH".format(humidityPct))
+            }
+            if (isPhone && humidityPct != null && tempC != null) {
+                Spacer(Modifier.height(12.dp))
+                BigStat("Dew Point", "%.1f °C".format(LiveStats.dewPointC(tempC, humidityPct)))
             }
             if (isPhone) {
                 Spacer(Modifier.height(16.dp))
