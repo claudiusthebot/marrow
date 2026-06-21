@@ -122,6 +122,13 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
     private val _systemLoadAvg = MutableStateFlow<Triple<Float, Float, Float>?>(null)
     val systemLoadAvg: StateFlow<Triple<Float, Float, Float>?> = _systemLoadAvg.asStateFlow()
 
+    /**
+     * Process/thread count from /proc/loadavg as Pair(running, total).
+     * null until the first live-loop tick.
+     */
+    private val _processCount = MutableStateFlow<Pair<Int, Int>?>(null)
+    val processCount: StateFlow<Pair<Int, Int>?> = _processCount.asStateFlow()
+
     // -- History buffers (for sparkline charts) ----------------------------------
 
     // -- Sparkline range ---------------------------------------------------------
@@ -755,6 +762,8 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 _thermalZones.value = LiveStats.thermalZones()
                 // System load averages — /proc/loadavg, world-readable, no permissions needed
                 _systemLoadAvg.value = LiveStats.systemLoadAvg()
+                // Process count — same /proc/loadavg file, field 4 "running/total"
+                _processCount.value = LiveStats.processCount()
                 // History buffers — push latest CPU% and RAM% for sparkline charts
                 val histN = _sparklineRange.value.samples
                 if (_cpuUsagePercent.value >= 0f) {

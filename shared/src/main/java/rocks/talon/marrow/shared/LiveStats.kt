@@ -1634,6 +1634,42 @@ object LiveStats {
         parseLoadAvg(File("/proc/loadavg").readText())
     }.getOrNull()
 
+
+    /**
+     * Parses the process count from a /proc/loadavg line.
+     *
+     * /proc/loadavg format:
+     *   0.52 0.58 0.60 2/748 12345
+     *
+     * Field 4 is "running/total" — the number of currently running (runnable)
+     * kernel-scheduled entities and the total count of all processes/threads.
+     *
+     * @return Pair(running, total) or null if the line is malformed.
+     */
+    internal fun parseProcessCount(line: String): Pair<Int, Int>? {
+        val parts = line.trim().split(Regex("\\s+"))
+        if (parts.size < 4) return null
+        val ratio = parts[3].split("/")
+        if (ratio.size != 2) return null
+        val running = ratio[0].toIntOrNull() ?: return null
+        val total = ratio[1].toIntOrNull() ?: return null
+        return Pair(running, total)
+    }
+
+    /**
+     * Returns the current process/thread counts from /proc/loadavg as
+     * Pair(running, total), or null if the file is unreadable.
+     *
+     * "running" is the number of runnable kernel-scheduled entities (processes
+     * or threads actively competing for CPU time). "total" is the total count
+     * of all processes and threads on the system.
+     *
+     * No permissions required — /proc/loadavg is world-readable on Android.
+     */
+    fun processCount(): Pair<Int, Int>? = runCatching {
+        parseProcessCount(File("/proc/loadavg").readText())
+    }.getOrNull()
+
     // -- Derived environment stats -----------------------------------------------
 
     /**

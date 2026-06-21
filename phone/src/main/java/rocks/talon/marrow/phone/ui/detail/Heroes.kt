@@ -289,6 +289,7 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
     val cpuUsage by vm.cpuUsagePercent.collectAsState()
     val thermalZones by vm.thermalZones.collectAsState()
     val loadAvg by vm.systemLoadAvg.collectAsState()
+    val processCount by vm.processCount.collectAsState()
     val cpuHistory by vm.cpuHistory.collectAsState()
     val coreCount = section.rows.firstOrNull { it.label == "Cores" }?.value?.toIntOrNull() ?: cores.size
     val abis = section.rows.firstOrNull { it.label == "ABIs" }?.value
@@ -443,6 +444,13 @@ fun CpuHero(vm: MarrowViewModel, section: Section, isWatch: Boolean) {
                 BigStat("Load 5m", "%.2f".format(loadAvg!!.second))
                 Spacer(Modifier.height(16.dp))
                 BigStat("Load 15m", "%.2f".format(loadAvg!!.third))
+            }
+            if (!isWatch && processCount != null) {
+                Spacer(Modifier.height(16.dp))
+                BigStat(
+                    "Processes",
+                    "${processCount!!.second} total · ${processCount!!.first} running",
+                )
             }
             // CPU sparkline — 60-second rolling history, phone only
             if (!isWatch && cpuHistory.size >= 2) {
