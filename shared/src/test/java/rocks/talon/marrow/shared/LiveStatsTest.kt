@@ -979,4 +979,47 @@ class LiveStatsTest {
         assertTrue("Altitude for >1013.25 hPa should be negative but got $alt", alt < 0f)
     }
 
+
+    // ── parseProcessCount ─────────────────────────────────────────────────────
+
+    @Test fun parseProcessCount_typical_line_returns_correct_pair() {
+        val result = LiveStats.parseProcessCount("1.23 4.56 7.89 2/748 12345")
+        assertNotNull(result)
+        assertEquals(2, result!!.first)
+        assertEquals(748, result.second)
+    }
+
+    @Test fun parseProcessCount_single_running_returns_correct_pair() {
+        val result = LiveStats.parseProcessCount("0.00 0.00 0.00 1/1 1")
+        assertNotNull(result)
+        assertEquals(1, result!!.first)
+        assertEquals(1, result.second)
+    }
+
+    @Test fun parseProcessCount_high_count_parses_correctly() {
+        val result = LiveStats.parseProcessCount("16.00 12.50 8.75 64/2048 99999")
+        assertNotNull(result)
+        assertEquals(64, result!!.first)
+        assertEquals(2048, result.second)
+    }
+
+    @Test fun parseProcessCount_extra_whitespace_is_tolerated() {
+        val result = LiveStats.parseProcessCount("  0.52  0.58  0.60  3/512  98765  ")
+        assertNotNull(result)
+        assertEquals(3, result!!.first)
+        assertEquals(512, result.second)
+    }
+
+    @Test fun parseProcessCount_missing_fourth_field_returns_null() {
+        assertNull(LiveStats.parseProcessCount("1.23 4.56 7.89"))
+    }
+
+    @Test fun parseProcessCount_malformed_ratio_returns_null() {
+        assertNull(LiveStats.parseProcessCount("1.23 4.56 7.89 not_a_ratio 12345"))
+    }
+
+    @Test fun parseProcessCount_non_numeric_running_returns_null() {
+        assertNull(LiveStats.parseProcessCount("1.23 4.56 7.89 x/748 12345"))
+    }
+
 }
