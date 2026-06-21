@@ -84,6 +84,19 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val _ramHistory = MutableStateFlow<List<Float>>(emptyList())
     val ramHistory: StateFlow<List<Float>> = _ramHistory.asStateFlow()
 
+    /** Rolling 60-sample history of network RX bytes/sec for the home-screen sparkline. */
+    private var prevRxBytes: Long? = null
+    private var prevTxBytes: Long? = null
+    private var prevNetworkTickMs: Long = 0L
+
+    private val rxHistoryBuffer = HistoryBuffer(60)
+    private val _rxHistory = MutableStateFlow<List<Float>>(emptyList())
+    val rxHistory: StateFlow<List<Float>> = _rxHistory.asStateFlow()
+
+    private val txHistoryBuffer = HistoryBuffer(60)
+    private val _txHistory = MutableStateFlow<List<Float>>(emptyList())
+    val txHistory: StateFlow<List<Float>> = _txHistory.asStateFlow()
+
     /** Live CPU core frequency snapshots. Updated in the live loop. Empty list until
      *  first tick, or on emulators / SELinux-restricted devices. */
     private val _cpuCores = MutableStateFlow<List<LiveStats.CpuCore>>(emptyList())
@@ -230,6 +243,26 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 _cpuCores.value = LiveStats.cpuCores()
                 _gpu.value = LiveStats.gpu()
                 _cellular.value = LiveStats.cellularInfo(getApplication())
+                // Network throughput sparklines: compute bytes/sec delta each tick.
+                val nowMs = System.currentTimeMillis()
+                val rxBytes = LiveStats.totalRxBytes()
+                val txBytes = LiveStats.totalTxBytes()
+                val prevRx = prevRxBytes
+                val prevTx = prevTxBytes
+                if (rxBytes != null && txBytes != null && prevRx != null && prevTx != null && prevNetworkTickMs > 0L) {
+                    val dtSec = (nowMs - prevNetworkTickMs) / 1000f
+                    if (dtSec > 0f) {
+                        val rxRate = ((rxBytes - prevRx).toFloat() / dtSec).coerceAtLeast(0f)
+                        val txRate = ((txBytes - prevTx).toFloat() / dtSec).coerceAtLeast(0f)
+                        rxHistoryBuffer.push(rxRate)
+                        txHistoryBuffer.push(txRate)
+                        _rxHistory.value = rxHistoryBuffer.snapshot()
+                        _txHistory.value = txHistoryBuffer.snapshot()
+                    }
+                }
+                prevRxBytes = rxBytes
+                prevTxBytes = txBytes
+                prevNetworkTickMs = nowMs
                 // Update sparkline history buffers for the home-screen charts.
                 batt?.percent?.let { pct ->
                     batteryHistoryBuffer.push(pct.toFloat())
