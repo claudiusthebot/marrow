@@ -148,6 +148,7 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
         _rxHistory.value               = _rxHistoryBuffer.lastN(range.samples)
         _txHistory.value               = _txHistoryBuffer.lastN(range.samples)
         _batteryCurrentHistory.value   = _batteryCurrentHistoryBuffer.lastN(range.samples)
+        _gpuFreqHistory.value          = _gpuFreqHistoryBuffer.lastN(range.samples)
     }
 
     // -- History buffers (for sparkline charts) ----------------------------------
@@ -211,6 +212,18 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
      */
     private val _batteryCurrentHistory = MutableStateFlow<List<Float>>(emptyList())
     val batteryCurrentHistory: StateFlow<List<Float>> = _batteryCurrentHistory.asStateFlow()
+
+    /** Backing circular buffer for [gpuFreqHistory]. In-memory only — not persisted to DataStore. */
+    private val _gpuFreqHistoryBuffer = HistoryBuffer(capacity = 900)
+
+    /**
+     * Rolling history of GPU core frequency in MHz (newest last).
+     * Pushed each live-loop tick from [LiveStats.Gpu.curMhz] when [LiveStats.Gpu.available] is true.
+     * Empty on devices that do not expose GPU frequency via devfreq/kgsl sysfs.
+     * In-memory only — does not survive app restart (sparkline resets on relaunch).
+     */
+    private val _gpuFreqHistory = MutableStateFlow<List<Float>>(emptyList())
+    val gpuFreqHistory: StateFlow<List<Float>> = _gpuFreqHistory.asStateFlow()
 
     /**
      * Live GPU stats — current frequency, min/max, governor, and utilisation.
@@ -780,6 +793,13 @@ class MarrowViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 // GPU — frequency, utilisation, governor (kgsl or generic devfreq)
                 _gpu.value = LiveStats.gpu()
+                // GPU frequency history — push curMhz when available for sparkline chart
+                _gpu.value?.let { g ->
+                    if (g.available && g.curMhz > 0L) {
+                        _gpuFreqHistoryBuffer.push(g.curMhz.toFloat())
+                        _gpuFreqHistory.value = _gpuFreqHistoryBuffer.lastN(_sparklineRange.value.samples)
+                    }
+                }
                 // Wi-Fi RSSI — live signal strength in dBm (null when not on Wi-Fi)
                 _wifiRssiDbm.value = LiveStats.wifiRssi(ctx)
                 // Wi-Fi link speed — negotiated data rate in Mbps (null when not on Wi-Fi)
