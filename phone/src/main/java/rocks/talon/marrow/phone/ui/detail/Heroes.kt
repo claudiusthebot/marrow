@@ -816,6 +816,7 @@ private fun LegendDot(color: Color, label: String) {
 @Composable
 fun GpuHero(vm: MarrowViewModel, section: Section) {
     val gpu by vm.gpu.collectAsState()
+    val gpuFreqHistory by vm.gpuFreqHistory.collectAsState()
 
     // Frequency bar: currentFreq / maxFreq (0f when unavailable)
     val freqFrac = gpu?.freqFraction ?: 0f
@@ -906,6 +907,18 @@ fun GpuHero(vm: MarrowViewModel, section: Section) {
                         if (maxMhz > 0) "$maxMhz MHz max" else "",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                // GPU frequency sparkline — in-memory rolling history, same range selector as other charts
+                if (gpuFreqHistory.size >= 2) {
+                    Spacer(Modifier.height(8.dp))
+                    SparklineChart(
+                        data = gpuFreqHistory,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
                     )
                 }
 
