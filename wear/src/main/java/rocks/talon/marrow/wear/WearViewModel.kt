@@ -28,6 +28,11 @@ import rocks.talon.marrow.wear.sync.pingPhone
  * Holds the shared device-info snapshot for every screen in the watch app and
  * the small ping-phone state machine.
  *
+ * v1.7.0 additions:
+ * - System load averages via LiveStats.systemLoadAvg() (reads /proc/loadavg).
+ *   Exposed as [loadAvg] StateFlow<Triple<Float,Float,Float>?> — 1-min, 5-min, 15-min.
+ *   Updated every 10 s in [startLive]. No permissions required.
+ *
  * v0.50.0 additions:
  * - Cellular stats via TelephonyManager. [cellularInfo] seeds in [refresh] and
  *   polls in [startLive]. Requires READ_BASIC_PHONE_STATE (normal permission,
@@ -107,6 +112,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *  `available = false` and the GPU detail card falls back to its raw rows. */
     private val _gpu = MutableStateFlow<LiveStats.Gpu?>(null)
     val gpu: StateFlow<LiveStats.Gpu?> = _gpu.asStateFlow()
+
+    /**
+     * System load averages from /proc/loadavg — 1-min, 5-min, 15-min.
+     * null until the first live loop tick. World-readable on all Android/Wear OS
+     * devices; no permissions required. Updated every 10 s in [startLive].
+     */
+    private val _loadAvg = MutableStateFlow<Triple<Float, Float, Float>?>(null)
+    val loadAvg: StateFlow<Triple<Float, Float, Float>?> = _loadAvg.asStateFlow()
 
     /**
      * Cumulative step count since last device reboot via TYPE_STEP_COUNTER.
@@ -242,6 +255,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 _memory.value = mem
                 _cpuCores.value = LiveStats.cpuCores()
                 _gpu.value = LiveStats.gpu()
+                _loadAvg.value = LiveStats.systemLoadAvg()
                 _cellular.value = LiveStats.cellularInfo(getApplication())
                 // Network throughput sparklines: compute bytes/sec delta each tick.
                 val nowMs = System.currentTimeMillis()
