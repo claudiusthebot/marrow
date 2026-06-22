@@ -159,6 +159,7 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
     val cellular by vm.cellular.collectAsState()
     val rxHistory by vm.rxHistory.collectAsState()
     val txHistory by vm.txHistory.collectAsState()
+    val loadAvg by vm.loadAvg.collectAsState()
 
     // Check BODY_SENSORS permission. If not granted, the HR sensor never fires
     // and heartRateBpm stays null — HeartRatePermissionCard is shown instead.
@@ -258,6 +259,21 @@ private fun SectionListScreen(vm: WearViewModel, nav: NavHostController) {
                     NetworkSparklineCard(
                         rxHistory = rxHistory,
                         txHistory = txHistory,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .transformedHeight(this, transformSpec),
+                        transformation = SurfaceTransformation(transformSpec),
+                    )
+                }
+            }
+
+            // CPU load averages — visible after the first live tick (typically 10 s).
+            // Shows 1-min, 5-min, and 15-min load averages from /proc/loadavg.
+            // No permissions required; world-readable on all Android/Wear OS devices.
+            if (!isLoading && loadAvg != null) {
+                item {
+                    LoadAvgCard(
+                        loadAvg = loadAvg!!,
                         modifier = Modifier
                             .fillMaxWidth()
                             .transformedHeight(this, transformSpec),
@@ -532,6 +548,91 @@ private fun NetworkSparklineCard(
                             .fillMaxWidth()
                             .height(24.dp)
                             .padding(horizontal = 4.dp, vertical = 2.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Compact CPU load average card for the home screen.
+ *
+ * Shows 1-min, 5-min, and 15-min load averages from /proc/loadavg,
+ * driven by WearViewModel.loadAvg (polled every 10 s in startLive).
+ *
+ * No permissions required — /proc/loadavg is world-readable on all
+ * Android and Wear OS devices.
+ *
+ * Colour coding by 1-min load relative to 1 (one fully-loaded core):
+ *   primary   — load < 0.5  (idle)
+ *   tertiary  — 0.5 ≤ load < 1.0 (moderate)
+ *   error     — load ≥ 1.0  (saturated)
+ */
+@Composable
+private fun LoadAvgCard(
+    loadAvg: Triple<Float, Float, Float>,
+    modifier: Modifier,
+    transformation: SurfaceTransformation,
+) {
+    val (load1, load5, load15) = loadAvg
+    val valueColor = when {
+        load1 >= 1.0f -> MaterialTheme.colorScheme.error
+        load1 >= 0.5f -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.primary
+    }
+    Card(
+        onClick = {},
+        modifier = modifier,
+        transformation = transformation,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = "CPU Load",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "%.2f".format(load1),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = valueColor,
+                    )
+                    Text(
+                        text = "1 min",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "%.2f".format(load5),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "5 min",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "%.2f".format(load15),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "15 min",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
